@@ -1,24 +1,7 @@
 ﻿/*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -34,34 +17,52 @@ public class BoxShape : RigidBodyShape
     private JVector halfSize;
 
     /// <summary>
-    /// Gets or sets the dimensions of the box.
-    /// </summary>
-    public JVector Size
-    {
-        get => (Real)2.0 * halfSize;
-        set
-        {
-            halfSize = value * (Real)0.5;
-            UpdateWorldBoundingBox();
-        }
-    }
-
-    /// <summary>
     /// Creates a box shape with specified dimensions.
     /// </summary>
     /// <param name="size">The dimensions of the box.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when any component of <paramref name="size"/> is less than or equal to zero.
+    /// </exception>
     public BoxShape(JVector size)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size.X, nameof(size));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size.Y, nameof(size));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size.Z, nameof(size));
+
         halfSize = (Real)0.5 * size;
         UpdateWorldBoundingBox();
     }
 
     /// <summary>
-    /// Creates a cube shape with the specified side length.
+    /// Gets or sets the dimensions of the box.
     /// </summary>
-    /// <param name="size">The length of each side of the cube.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when any component of <paramref name="value"/> is less than or equal to zero.
+    /// </exception>
+    public JVector Size
+    {
+        get => (Real)2.0 * halfSize;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.X, nameof(Size));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.Y, nameof(Size));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.Z, nameof(Size));
+
+            halfSize = value * 0.5f;
+            UpdateWorldBoundingBox();
+        }
+    }
+
+    /// <summary>
+    /// </summary>
+    /// <param name="size">The length of each side.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="size"/> is less than or equal to zero.
+    /// </exception>
     public BoxShape(Real size)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size, nameof(size));
+
         halfSize = new JVector(size * (Real)0.5);
         UpdateWorldBoundingBox();
     }
@@ -72,9 +73,17 @@ public class BoxShape : RigidBodyShape
     /// <param name="length">The length of the box.</param>
     /// <param name="height">The height of the box.</param>
     /// <param name="width">The width of the box.</param>
-    public BoxShape(Real length, Real height, Real width)
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="length"/>, <paramref name="height"/>, or <paramref name="width"/> is less than
+    /// or equal to zero.
+    /// </exception>
+    public BoxShape(Real width, Real height, Real length)
     {
-        halfSize = (Real)0.5 * new JVector(length, height, width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length, nameof(length));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height, nameof(height));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width,  nameof(width));
+
+        halfSize = (Real)0.5 * new JVector(width, height, length);
         UpdateWorldBoundingBox();
     }
 
@@ -173,7 +182,7 @@ public class BoxShape : RigidBodyShape
         point = JVector.Zero;
     }
 
-    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBBox box)
+    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBoundingBox box)
     {
         JMatrix.Absolute(JMatrix.CreateFromQuaternion(orientation), out JMatrix absm);
         var ths = JVector.Transform(halfSize, absm);

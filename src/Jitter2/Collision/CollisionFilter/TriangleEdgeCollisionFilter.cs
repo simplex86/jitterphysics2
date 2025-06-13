@@ -1,29 +1,11 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 // #define DEBUG_EDGEFILTER
 
-using System;
 using System.Runtime.CompilerServices;
 using Jitter2.Collision.Shapes;
 using Jitter2.LinearMath;
@@ -45,7 +27,7 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
     public Real EdgeThreshold { get; set; } = (Real)0.01;
 
     // approx 2.5°
-    private Real cosAT = (Real)0.999;
+    private Real cosAngle = (Real)0.999;
 
     /// <summary>
     /// A tweakable parameter.
@@ -58,8 +40,8 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
     /// </summary>
     public JAngle AngleThreshold
     {
-        get => JAngle.FromRadian(MathR.Acos(cosAT));
-        set => cosAT = MathR.Cos(value.Radian);
+        get => JAngle.FromRadian(MathR.Acos(cosAngle));
+        set => cosAngle = MathR.Cos(value.Radian);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -106,12 +88,12 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
         ref var triangle = ref triangleShape.Mesh.Indices[triangleShape.Index];
 
         JVector tnormal = triangle.Normal;
-        tnormal = JVector.Transform(tnormal, triangleShape.RigidBody!.Data.Orientation);
+        tnormal = JVector.Transform(tnormal, triangleShape.RigidBody.Data.Orientation);
 
         if (c2) JVector.NegateInPlace(ref tnormal);
 
         // Make triangles penetrable from one side
-        if (JVector.Dot(normal, tnormal) < -cosAT) return false;
+        if (JVector.Dot(normal, tnormal) < -cosAngle) return false;
 
         triangleShape.GetWorldVertices(out JVector a, out JVector b, out JVector c);
 
@@ -119,20 +101,18 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
         ProjectPointOnPlane(ref collP, a, b, c);
 
         JVector n, pma;
-        Real d0, d1, d2;
 
-        // TODO: this can be optimized
         n = b - a;
         pma = collP - a;
-        d0 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
+        var d0 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
 
         n = c - a;
         pma = collP - a;
-        d1 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
+        var d1 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
 
         n = c - b;
         pma = collP - b;
-        d2 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
+        var d2 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
 
         if (MathR.Min(MathR.Min(d0, d1), d2) > EdgeThreshold * EdgeThreshold) return true;
 
@@ -167,7 +147,7 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
             // but with zero epa threshold parameter. This is necessary since
             // MPR is not exact for flat shapes, like triangles.
 
-            bool result = NarrowPhase.MPREPA(shapeA, shapeB,
+            bool result = NarrowPhase.MprEpa(shapeA, shapeB,
                 b1Data.Orientation, b2Data.Orientation,
                 b1Data.Position, b2Data.Position,
                 out pointA, out pointB, out normal, out penetration,
@@ -189,9 +169,9 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
         // we have a collision close to an edge, with
         //
         // tnormal -> the triangle normal where collision occurred
-        // nnormal -> the normal of neighbouring triangle
+        // nnormal -> the normal of neighboring triangle
         // normal  -> the collision normal
-        if (JVector.Dot(tnormal, nnormal) > cosAT)
+        if (JVector.Dot(tnormal, nnormal) > cosAngle)
         {
             // tnormal and nnormal are the same
             // --------------------------------

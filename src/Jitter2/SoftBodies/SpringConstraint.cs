@@ -1,27 +1,9 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.Dynamics;
@@ -42,8 +24,8 @@ public unsafe class SpringConstraint : Constraint
     public struct SpringData
     {
         internal int _internal;
-        public delegate*<ref ConstraintData, void> Iterate;
-        public delegate*<ref ConstraintData, Real, void> PrepareForIteration;
+        private readonly delegate*<ref ConstraintData, void> iterate;
+        private readonly delegate*<ref ConstraintData, Real, void> prepareForIteration;
 
         public JHandle<RigidBodyData> Body1;
         public JHandle<RigidBodyData> Body2;
@@ -68,8 +50,8 @@ public unsafe class SpringConstraint : Constraint
     {
         CheckDataSize<SpringData>();
 
-        iterate = &Iterate;
-        prepareForIteration = &PrepareForIteration;
+        Iterate = &IterateSpringConstraint;
+        PrepareForIteration = &PrepareForIterationSpringConstraint;
         handle = JHandle<ConstraintData>.AsHandle<SpringData>(Handle);
     }
 
@@ -167,7 +149,7 @@ public unsafe class SpringConstraint : Constraint
         }
     }
 
-    public static void PrepareForIteration(ref ConstraintData constraint, Real idt)
+    public static void PrepareForIterationSpringConstraint(ref ConstraintData constraint, Real idt)
     {
         ref SpringData data = ref Unsafe.AsRef<SpringData>(Unsafe.AsPointer(ref constraint));
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -184,7 +166,7 @@ public unsafe class SpringConstraint : Constraint
         Real error = dp.Length() - data.Distance;
 
         JVector n = p2 - p1;
-        if (n.LengthSquared() != (Real)0.0) JVector.NormalizeInPlace(ref n);
+        if (n.LengthSquared() > (Real)1e-12) JVector.NormalizeInPlace(ref n);
 
         data.Jacobian = n;
         data.EffectiveMass = body1.InverseMass + body2.InverseMass;
@@ -209,7 +191,7 @@ public unsafe class SpringConstraint : Constraint
         set => handle.Data.BiasFactor = value;
     }
 
-    public static void Iterate(ref ConstraintData constraint, Real idt)
+    public static void IterateSpringConstraint(ref ConstraintData constraint, Real idt)
     {
         ref SpringData data = ref Unsafe.AsRef<SpringData>(Unsafe.AsPointer(ref constraint));
         ref RigidBodyData body1 = ref constraint.Body1.Data;
@@ -221,9 +203,9 @@ public unsafe class SpringConstraint : Constraint
 
         Real lambda = -data.EffectiveMass * (jv + data.Bias + softnessScalar);
 
-        Real oldacc = data.AccumulatedImpulse;
+        Real oldAccumulatedImpulse = data.AccumulatedImpulse;
         data.AccumulatedImpulse += lambda;
-        lambda = data.AccumulatedImpulse - oldacc;
+        lambda = data.AccumulatedImpulse - oldAccumulatedImpulse;
 
         body1.Velocity -= body1.InverseMass * lambda * data.Jacobian;
         body2.Velocity += body2.InverseMass * lambda * data.Jacobian;

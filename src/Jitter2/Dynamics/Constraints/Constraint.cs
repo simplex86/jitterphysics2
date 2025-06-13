@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -85,8 +68,8 @@ public abstract class Constraint : IDebugDrawable
     {
     }
 
-    protected unsafe delegate*<ref ConstraintData, Real, void> iterate = null;
-    protected unsafe delegate*<ref ConstraintData, Real, void> prepareForIteration = null;
+    protected unsafe delegate*<ref ConstraintData, Real, void> Iterate = null;
+    protected unsafe delegate*<ref ConstraintData, Real, void> PrepareForIteration = null;
 
     /// <summary>
     /// Enables or disables this constraint temporarily. For a complete removal of the constraint,
@@ -97,8 +80,8 @@ public abstract class Constraint : IDebugDrawable
         get => Handle.Data.Iterate != null;
         set
         {
-            Handle.Data.Iterate = value ? iterate : null;
-            Handle.Data.PrepareForIteration = value ? prepareForIteration : null;
+            Handle.Data.Iterate = value ? Iterate : null;
+            Handle.Data.PrepareForIteration = value ? PrepareForIteration : null;
         }
     }
 
@@ -115,17 +98,12 @@ public abstract class Constraint : IDebugDrawable
         Body2 = body2;
         Handle = handle;
 
-        handle.Data.Body1 = body1.handle;
-        handle.Data.Body2 = body2.handle;
+        handle.Data.Body1 = body1.Handle;
+        handle.Data.Body2 = body2.Handle;
 
         Create();
 
         IsEnabled = true;
-    }
-
-    public override int GetHashCode()
-    {
-        return Body1.GetHashCode() ^ Body2.GetHashCode();
     }
 
     public virtual void DebugDraw(IDebugDrawer drawer)

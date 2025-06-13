@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -26,7 +9,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using Jitter2.Unmanaged;
 
 namespace Jitter2.DataStructures;
 
@@ -35,15 +17,9 @@ public interface IPartitionedSetIndex
     int SetIndex { get; set; }
 }
 
-public readonly struct ReadOnlyPartitionedSet<T> : IEnumerable<T> where T : class, IPartitionedSetIndex
+public readonly struct ReadOnlyPartitionedSet<T>(PartitionedSet<T> partitionedSet) : IEnumerable<T>
+    where T : class, IPartitionedSetIndex
 {
-    private readonly PartitionedSet<T> partitionedSet;
-
-    internal ReadOnlyPartitionedSet(PartitionedSet<T> partitionedSet)
-    {
-        this.partitionedSet = partitionedSet;
-    }
-
     public int ActiveCount => partitionedSet.ActiveCount;
     public int Count => partitionedSet.Count;
 
@@ -64,10 +40,9 @@ public readonly struct ReadOnlyPartitionedSet<T> : IEnumerable<T> where T : clas
 
     public T this[int i] => partitionedSet[i];
 
-    public bool IsActive(T element)
-    {
-        return partitionedSet.IsActive(element);
-    }
+    public bool Contains(T element) => partitionedSet.Contains(element);
+
+    public bool IsActive(T element) => partitionedSet.IsActive(element);
 
     public PartitionedSet<T>.Enumerator GetEnumerator()
     {
@@ -216,6 +191,12 @@ public class PartitionedSet<T> : IEnumerable<T> where T : class, IPartitionedSet
         ActiveCount -= 1;
         Swap(ActiveCount, element.SetIndex);
         return true;
+    }
+
+    public bool Contains(T element)
+    {
+        if(element.SetIndex >= Count || element.SetIndex < 0) return false;
+        return (elements[element.SetIndex] == element);
     }
 
     public void Remove(T element)

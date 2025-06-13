@@ -1,33 +1,15 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
-using System;
 using Jitter2.Dynamics;
 using Jitter2.LinearMath;
 
 namespace Jitter2.SoftBodies;
 
-public class SoftBodyTriangle : SoftBodyShape
+public sealed class SoftBodyTriangle : SoftBodyShape
 {
     private readonly RigidBody v1;
     private readonly RigidBody v2;
@@ -80,14 +62,14 @@ public class SoftBodyTriangle : SoftBodyShape
     {
         Real extraMargin = MathR.Max(halfThickness, (Real)0.01);
 
-        JBBox box = JBBox.SmallBox;
+        JBoundingBox box = JBoundingBox.SmallBox;
 
-        JBBox.AddPointInPlace(ref box, Vertex1.Position);
-        JBBox.AddPointInPlace(ref box, Vertex2.Position);
-        JBBox.AddPointInPlace(ref box, Vertex3.Position);
+        JBoundingBox.AddPointInPlace(ref box, Vertex1.Position);
+        JBoundingBox.AddPointInPlace(ref box, Vertex2.Position);
+        JBoundingBox.AddPointInPlace(ref box, Vertex3.Position);
 
         // prevent a degenerate bounding box
-        JVector extra = new JVector(extraMargin);
+        JVector extra = new(extraMargin);
         box.Min -= extra;
         box.Max += extra;
 

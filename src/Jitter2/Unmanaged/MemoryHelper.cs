@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System.Runtime.InteropServices;
@@ -80,9 +63,9 @@ public static unsafe class MemoryHelper
     /// <typeparam name="T">The unmanaged type of the elements to allocate memory for.</typeparam>
     /// <param name="num">The number of elements to allocate memory for.</param>
     /// <returns>A pointer to the allocated memory block.</returns>
-    public static T* AllocateHeap<T>(int num, int alignment) where T : unmanaged
+    public static T* AlignedAllocateHeap<T>(int num, int alignment) where T : unmanaged
     {
-        return (T*)AllocateHeap(num * sizeof(T), alignment);
+        return (T*)AlignedAllocateHeap(num * sizeof(T), alignment);
     }
 
     /// <summary>
@@ -107,7 +90,7 @@ public static unsafe class MemoryHelper
     /// </summary>
     /// <param name="len">The length of the memory block to allocate, in bytes.</param>
     /// <returns>A pointer to the allocated memory block.</returns>
-    public static void* AllocateHeap(int len, int alignment) => NativeMemory.AlignedAlloc((nuint)len, (nuint)alignment);
+    public static void* AlignedAllocateHeap(int len, int alignment) => NativeMemory.AlignedAlloc((nuint)len, (nuint)alignment);
 
     /// <summary>
     /// Frees a block of unmanaged memory previously allocated.

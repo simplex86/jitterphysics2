@@ -1,27 +1,11 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -34,12 +18,41 @@ namespace Jitter2.DataStructures;
 /// decrementing by one.
 /// </summary>
 /// <typeparam name="T">The type of elements in the SlimBag.</typeparam>
-internal class SlimBag<T>
+internal class SlimBag<T> : IEnumerable<T>
 {
+    /// <summary>Lightweight struct enumerator. NOT safe if the bag is
+    /// mutated while enumeration is in progress.
+    /// </summary>
+    public struct Enumerator : IEnumerator<T>
+    {
+        private readonly SlimBag<T> owner;
+        private int index;
+
+        internal Enumerator(SlimBag<T> owner)
+        {
+            this.owner = owner;
+            index = -1;
+        }
+
+        public T Current => owner.array[index];
+        object? IEnumerator.Current => Current;
+
+        public bool MoveNext()
+        {
+            // advance and check against the number of valid items, not array.Length
+            return ++index < owner.counter;
+        }
+
+        // No resources to release
+        public void Dispose() { }
+
+        public void Reset() => index = -1;
+    }
+
     private T[] array;
     private int counter;
     private int nullOut;
-    private readonly IEqualityComparer<T> comparer = EqualityComparer<T>.Default;
+    private readonly EqualityComparer<T> comparer = EqualityComparer<T>.Default;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SlimBag{T}"/> class with a specified initial size.
@@ -181,9 +194,9 @@ internal class SlimBag<T>
     }
 
     /// <summary>
-    /// This should be called after adding entries to the SlimBag in order
+    /// This should be called after adding entries to the SlimBag
     /// to keep track of the largest index used within the internal array of
-    /// this datastructure. It will set this item in the array to its default value
+    /// this data structure. It will set this item in the array to its default value
     /// to allow for garbage collection.
     /// </summary>
     public void TrackAndNullOutOne()
@@ -192,4 +205,9 @@ internal class SlimBag<T>
         if (nullOut <= counter) return;
         array[--nullOut] = default!;
     }
+
+    public Enumerator GetEnumerator() => new Enumerator(this);
+
+    IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

@@ -1,28 +1,10 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.LinearMath;
@@ -64,8 +46,8 @@ public unsafe class LinearMotor : Constraint
     {
         CheckDataSize<LinearMotorData>();
 
-        iterate = &Iterate;
-        prepareForIteration = &PrepareForIteration;
+        Iterate = &IterateLinearMotor;
+        PrepareForIteration = &PrepareForIterationLinearMotor;
         handle = JHandle<ConstraintData>.AsHandle<LinearMotorData>(Handle);
     }
 
@@ -113,18 +95,14 @@ public unsafe class LinearMotor : Constraint
         get => handle.Data.MaxForce;
         set
         {
-            if (value < (Real)0.0)
-            {
-                throw new ArgumentException("Maximum force must not be negative.");
-            }
-
+            ArgumentOutOfRangeException.ThrowIfNegative(value, nameof(value));
             handle.Data.MaxForce = value;
         }
     }
 
     public Real Impulse => handle.Data.AccumulatedImpulse;
 
-    public static void PrepareForIteration(ref ConstraintData constraint, Real idt)
+    public static void PrepareForIterationLinearMotor(ref ConstraintData constraint, Real idt)
     {
         ref LinearMotorData data = ref Unsafe.AsRef<LinearMotorData>(Unsafe.AsPointer(ref constraint));
 
@@ -144,13 +122,9 @@ public unsafe class LinearMotor : Constraint
 
     public override void DebugDraw(IDebugDrawer drawer)
     {
-        ref var data = ref handle.Data;
-
-        ref RigidBodyData body1 = ref data.Body1.Data;
-        ref RigidBodyData body2 = ref data.Body2.Data;
     }
 
-    public static void Iterate(ref ConstraintData constraint, Real idt)
+    public static void IterateLinearMotor(ref ConstraintData constraint, Real idt)
     {
         ref LinearMotorData data = ref Unsafe.AsRef<LinearMotorData>(Unsafe.AsPointer(ref constraint));
         ref RigidBodyData body1 = ref constraint.Body1.Data;
@@ -163,13 +137,13 @@ public unsafe class LinearMotor : Constraint
 
         Real lambda = -(jv - data.Velocity) * data.EffectiveMass;
 
-        Real olda = data.AccumulatedImpulse;
+        Real oldAccumulated = data.AccumulatedImpulse;
 
         data.AccumulatedImpulse += lambda;
 
         data.AccumulatedImpulse = Math.Clamp(data.AccumulatedImpulse, -data.MaxLambda, data.MaxLambda);
 
-        lambda = data.AccumulatedImpulse - olda;
+        lambda = data.AccumulatedImpulse - oldAccumulated;
 
         body1.Velocity -= j1 * lambda * body1.InverseMass;
         body2.Velocity += j2 * lambda * body2.InverseMass;

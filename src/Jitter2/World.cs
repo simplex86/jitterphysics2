@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -51,15 +34,8 @@ public sealed partial class World : IDisposable
     /// <summary>
     /// Provides access to objects in unmanaged memory. This operation is potentially unsafe.
     /// </summary>
-    public readonly struct SpanData
+    public readonly struct SpanData(World world)
     {
-        private readonly World world;
-
-        public SpanData(World world)
-        {
-            this.world = world;
-        }
-
         /// <summary>
         /// Returns the total amount of unmanaged memory allocated in bytes.
         /// </summary>
@@ -106,8 +82,8 @@ public sealed partial class World : IDisposable
     private readonly ShardedDictionary<ArbiterKey, Arbiter> arbiters =
         new(Parallelization.ThreadPool.ThreadCountSuggestion);
 
-    private readonly PartitionedSet<Island> islands = new();
-    private readonly PartitionedSet<RigidBody> bodies = new();
+    private readonly PartitionedSet<Island> islands = [];
+    private readonly PartitionedSet<RigidBody> bodies = [];
 
     private static ulong _idCounter;
 
@@ -151,7 +127,7 @@ public sealed partial class World : IDisposable
     /// <summary>
     /// All rigid bodies in this world.
     /// </summary>
-    public ReadOnlyPartitionedSet<RigidBody> RigidBodies => new ReadOnlyPartitionedSet<RigidBody>(bodies);
+    public ReadOnlyPartitionedSet<RigidBody> RigidBodies => new(bodies);
 
     /// <summary>
     /// Access to the <see cref="DynamicTree"/> instance. The instance
@@ -199,7 +175,7 @@ public sealed partial class World : IDisposable
 
     /// <summary>
     /// The number of substeps for each call to <see cref="World.Step(Real, bool)"/>.
-    /// Substepping is deactivated when set to one.
+    /// Sub-stepping is deactivated when set to one.
     /// </summary>
     public int SubstepCount
     {
@@ -229,12 +205,12 @@ public sealed partial class World : IDisposable
 
     // Make this global since it is used by nearly every method called
     // in World.Step.
-    private volatile int solverIterations = 6;
-    private volatile int velocityRelaxations = 4;
-    private volatile int substeps = 1;
+    private int solverIterations = 6;
+    private int velocityRelaxations = 4;
+    private int substeps = 1;
 
-    private Real substep_dt = (Real)(1.0 / 100.0);
-    private Real step_dt = (Real)(1.0 / 100.0);
+    private Real substepDt = (Real)(1.0 / 100.0);
+    private Real stepDt = (Real)(1.0 / 100.0);
 
     /// <summary>
     /// Creates an instance of the <see cref="World"/> class with the default capacity.
@@ -301,7 +277,7 @@ public sealed partial class World : IDisposable
         // the enumerator any longer, see https://github.com/dotnet/runtime/pull/37180
         // This comes in very handy for us.
 
-        foreach (var constraint in body.constraints)
+        foreach (var constraint in body.InternalConstraints)
         {
             Remove(constraint);
         }
@@ -312,19 +288,19 @@ public sealed partial class World : IDisposable
             shape.RigidBody = null!;
         }
 
-        foreach (var contact in body.contacts)
+        foreach (var contact in body.InternalContacts)
         {
             Remove(contact);
         }
 
         if (body == NullBody) return;
 
-        memRigidBodies.Free(body.handle);
+        memRigidBodies.Free(body.Handle);
 
-        // we must be our own island..
-        Debug.Assert(body.island is { bodies.Count: 1 });
+        // We must be our own island.
+        Debug.Assert(body.InternalIsland is { InternalBodies.Count: 1 });
 
-        body.handle = JHandle<RigidBodyData>.Zero;
+        body.Handle = JHandle<RigidBodyData>.Zero;
 
         IslandHelper.BodyRemoved(islands, body);
 
@@ -376,10 +352,10 @@ public sealed partial class World : IDisposable
 
     internal void ActivateBodyNextStep(RigidBody body)
     {
-        body.sleepTime = 0;
+        body.InternalSleepTime = 0;
 
         if (body.IsActive) return;
-        AddToActiveList(body.island);
+        AddToActiveList(body.InternalIsland);
     }
 
     internal void MakeBodyStatic(RigidBody body)
@@ -388,7 +364,7 @@ public sealed partial class World : IDisposable
 
         body.Data.IsStatic = true;
 
-        foreach (var constraint in body.constraints)
+        foreach (var constraint in body.InternalConstraints)
         {
             if (constraint.Body1.IsStatic && constraint.Body2.IsStatic)
             {
@@ -396,7 +372,7 @@ public sealed partial class World : IDisposable
             }
         }
 
-        foreach (var arbiter in body.contacts)
+        foreach (var arbiter in body.InternalContacts)
         {
             if(arbiter.Body1.IsStatic && arbiter.Body2.IsStatic)
             {
@@ -404,9 +380,9 @@ public sealed partial class World : IDisposable
             }
         }
 
-        if (body.connections.Count > 0)
+        if (body.InternalConnections.Count > 0)
         {
-            var connections = body.connections.ToArray();
+            var connections = body.InternalConnections.ToArray();
 
             foreach (var connection in connections)
             {
@@ -414,8 +390,8 @@ public sealed partial class World : IDisposable
             }
         }
 
-        Debug.Assert(body.connections.Count == 0);
-        Debug.Assert(body.island.bodies.Count == 1);
+        Debug.Assert(body.InternalConnections.Count == 0);
+        Debug.Assert(body.InternalIsland.InternalBodies.Count == 1);
 
         body.Data.Velocity = JVector.Zero;
         body.Data.AngularVelocity = JVector.Zero;
@@ -425,7 +401,7 @@ public sealed partial class World : IDisposable
 
     internal void DeactivateBodyNextStep(RigidBody body)
     {
-        body.sleepTime = Real.PositiveInfinity;
+        body.InternalSleepTime = Real.PositiveInfinity;
     }
 
     /// <summary>
@@ -435,6 +411,7 @@ public sealed partial class World : IDisposable
     /// <param name="body1">The first rigid body involved in the constraint.</param>
     /// <param name="body2">The second rigid body involved in the constraint.</param>
     /// <returns>A new instance of the specified constraint type.</returns>
+    /// <exception cref="PartitionedBuffer{T}.MaximumSizeException">Raised when the maximum size limit is exceeded.</exception>
     public T CreateConstraint<T>(RigidBody body1, RigidBody body2) where T : Constraint, new()
     {
         T constraint = new();
@@ -450,8 +427,8 @@ public sealed partial class World : IDisposable
 
         IslandHelper.ConstraintCreated(islands, constraint);
 
-        AddToActiveList(body1.island);
-        AddToActiveList(body2.island);
+        AddToActiveList(body1.InternalIsland);
+        AddToActiveList(body2.InternalIsland);
 
         return constraint;
     }
@@ -467,6 +444,7 @@ public sealed partial class World : IDisposable
     /// Creates and adds a new rigid body to the simulation world.
     /// </summary>
     /// <returns>A newly created instance of <see cref="RigidBody"/>.</returns>
+    /// <exception cref="PartitionedBuffer{T}.MaximumSizeException">Raised when the maximum size limit is exceeded.</exception>
     public RigidBody CreateRigidBody()
     {
         RigidBody body = new(memRigidBodies.Allocate(true, true), this);
@@ -476,7 +454,7 @@ public sealed partial class World : IDisposable
 
         IslandHelper.BodyAdded(islands, body);
 
-        AddToActiveList(body.island);
+        AddToActiveList(body.InternalIsland);
 
         return body;
     }

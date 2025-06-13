@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -53,16 +36,10 @@ public unsafe struct ConvexPolytope
         public Real ClosestToOriginSq;
     }
 
-    private struct Edge
+    private readonly struct Edge(short a, short b)
     {
-        public readonly short A;
-        public readonly short B;
-
-        public Edge(short a, short b)
-        {
-            A = a;
-            B = b;
-        }
+        public readonly short A = a;
+        public readonly short B = b;
 
         public static bool Equals(in Edge a, in Edge b)
         {
@@ -88,7 +65,7 @@ public unsafe struct ConvexPolytope
 
     private JVector center;
 
-    public Span<Triangle> HullTriangles => new(triangles, tPointer);
+    public readonly Span<Triangle> HullTriangles => new(triangles, tPointer);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref Vertex GetVertex(int index)
@@ -142,7 +119,7 @@ public unsafe struct ConvexPolytope
         Real alpha = (Real)1.0 - gamma - beta;
 
         // Clamp the projected barycentric coordinates to lie within the triangle,
-        // such that the clamped coordinates are closest (euclidean) to the original point.
+        // such that the clamped coordinates are closest (Euclidean) to the original point.
         //
         // [https://math.stackexchange.com/questions/1092912/find-closest-point-in-triangle-given-barycentric-coordinates-outside]
         if (alpha >= (Real)0.0 && beta < (Real)0.0)
@@ -211,8 +188,8 @@ public unsafe struct ConvexPolytope
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private readonly bool IsLit(int candidate, int w)
     {
-        // Checks if the triangle would be lit, if there would
-        // be a light at the origin.
+        // Checks if the triangle normal points to the same side as
+        // the vertex w.
         ref Triangle tr = ref triangles[candidate];
         JVector deltaA = vertices[w].V - vertices[tr.A].V;
         return JVector.Dot(deltaA, tr.Normal) > 0;
@@ -351,7 +328,7 @@ public unsafe struct ConvexPolytope
     /// the return value of this method.
     /// </summary>
     /// <returns>Indicates whether the polyhedron successfully incorporated the new vertex.</returns>
-    [System.Runtime.CompilerServices.SkipLocalsInit]
+    [SkipLocalsInit]
     public bool AddVertex(in Vertex vertex)
     {
         Debug.Assert(vPointer < MaxVertices, "Maximum number of vertices exceeded.");

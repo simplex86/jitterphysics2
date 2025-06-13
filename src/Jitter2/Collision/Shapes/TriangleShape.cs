@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -82,7 +65,7 @@ public class TriangleShape : RigidBodyShape
         c += position;
     }
 
-    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBBox box)
+    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBoundingBox box)
     {
         const Real extraMargin = (Real)0.01;
 
@@ -95,11 +78,11 @@ public class TriangleShape : RigidBodyShape
         JVector.Transform(b, orientation, out b);
         JVector.Transform(c, orientation, out c);
 
-        box = JBBox.SmallBox;
+        box = JBoundingBox.SmallBox;
 
-        JBBox.AddPointInPlace(ref box, a);
-        JBBox.AddPointInPlace(ref box, b);
-        JBBox.AddPointInPlace(ref box, c);
+        JBoundingBox.AddPointInPlace(ref box, a);
+        JBoundingBox.AddPointInPlace(ref box, b);
+        JBoundingBox.AddPointInPlace(ref box, c);
 
         // prevent a degenerate bounding box
         JVector extra = new JVector(extraMargin);

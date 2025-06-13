@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -34,46 +17,36 @@ namespace Jitter2.Collision.Shapes;
 /// </summary>
 public class ConvexHullShape : RigidBodyShape
 {
-    private struct CHullVector
+    private struct CHullVector(in JVector vertex) : IEquatable<CHullVector>
     {
-        public readonly JVector Vertex;
-        public ushort NeighborMinIndex;
-        public ushort NeighborMaxIndex;
+        public readonly JVector Vertex = vertex;
+        public ushort NeighborMinIndex = 0;
+        public ushort NeighborMaxIndex = 0;
 
-        public CHullVector(in JVector vertex)
+        public readonly override bool Equals(object? obj)
         {
-            Vertex = vertex;
-            NeighborMaxIndex = 0;
-            NeighborMinIndex = 0;
+            return obj is CHullVector other && Equals(other);
         }
 
-        public override bool Equals(object? obj)
-        {
-            if (obj is not CHullVector vector) return false;
-            return Vertex.Equals(vector.Vertex);
-        }
-
-        public override int GetHashCode()
+        public readonly override int GetHashCode()
         {
             return Vertex.GetHashCode();
         }
-    }
 
-    private readonly struct CHullTriangle
-    {
-        public readonly ushort IndexA;
-        public readonly ushort IndexB;
-        public readonly ushort IndexC;
-
-        public CHullTriangle(ushort a, ushort b, ushort c)
+        public readonly bool Equals(CHullVector other)
         {
-            IndexA = a;
-            IndexB = b;
-            IndexC = c;
+            return Vertex.Equals(other.Vertex);
         }
     }
 
-    private JBBox cachedBoundingBox;
+    private readonly struct CHullTriangle(ushort a, ushort b, ushort c)
+    {
+        public readonly ushort IndexA = a;
+        public readonly ushort IndexB = b;
+        public readonly ushort IndexC = c;
+    }
+
+    private JBoundingBox cachedBoundingBox;
     private JMatrix cachedInertia;
     private Real cachedMass;
     private JVector cachedCenter;
@@ -99,7 +72,7 @@ public class ConvexHullShape : RigidBodyShape
     private void Build(IReadOnlyList<JTriangle> triangles)
     {
         Dictionary<CHullVector, ushort> tmpIndices = new();
-        List<CHullVector> tmpVertices = new();
+        List<CHullVector> tmpVertices = [];
 
         ushort PushVector(CHullVector v)
         {
@@ -228,7 +201,7 @@ public class ConvexHullShape : RigidBodyShape
 
         const Real a = (Real)(1.0 / 60.0);
         const Real b = (Real)(1.0 / 120.0);
-        JMatrix C = new(a, b, b, b, a, b, b, b, a);
+        JMatrix canonicalInertia = new(a, b, b, b, a, b, b, b, a);
 
         JVector pointWithin = JVector.Zero;
 
@@ -248,21 +221,21 @@ public class ConvexHullShape : RigidBodyShape
             // check winding
             {
                 JVector normal = (column1 - column0) % (column2 - column0);
-                Real ddot = JVector.Dot(normal, column0 - pointWithin);
-                if (ddot < (Real)0.0)
+                Real dot = JVector.Dot(normal, column0 - pointWithin);
+                if (dot < (Real)0.0)
                 {
                     (column0, column1) = (column1, column0);
                 }
             }
 
-            JMatrix A = new(
+            JMatrix transformation = new(
                 column0.X, column1.X, column2.X,
                 column0.Y, column1.Y, column2.Y,
                 column0.Z, column1.Z, column2.Z);
 
-            Real detA = A.Determinant();
+            Real detA = transformation.Determinant();
 
-            JMatrix tetrahedronInertia = JMatrix.Multiply(A * C * JMatrix.Transpose(A), detA);
+            JMatrix tetrahedronInertia = JMatrix.Multiply(transformation * canonicalInertia * JMatrix.Transpose(transformation), detA);
 
             JVector tetrahedronCom = (Real)(1.0 / 4.0) * (column0 + column1 + column2);
             Real tetrahedronMass = (Real)(1.0 / 6.0) * detA;
@@ -276,7 +249,7 @@ public class ConvexHullShape : RigidBodyShape
         cachedCenter *= (Real)1.0 / cachedMass;
     }
 
-    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBBox box)
+    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBoundingBox box)
     {
         JVector halfSize = (Real)0.5 * (cachedBoundingBox.Max - cachedBoundingBox.Min);
         JVector center = (Real)0.5 * (cachedBoundingBox.Max + cachedBoundingBox.Min);

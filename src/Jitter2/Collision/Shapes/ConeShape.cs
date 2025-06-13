@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -37,11 +20,15 @@ public class ConeShape : RigidBodyShape
     /// <summary>
     /// Gets or sets the radius of the cone at its base.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when radius is less than or equal to zero.
+    /// </exception>
     public Real Radius
     {
         get => radius;
         set
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Radius));
             radius = value;
             UpdateWorldBoundingBox();
         }
@@ -50,11 +37,15 @@ public class ConeShape : RigidBodyShape
     /// <summary>
     /// Gets or sets the height of the cone.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="value"/> is less than or equal to zero.
+    /// </exception>
     public Real Height
     {
         get => height;
         set
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Height));
             height = value;
             UpdateWorldBoundingBox();
         }
@@ -65,8 +56,14 @@ public class ConeShape : RigidBodyShape
     /// </summary>
     /// <param name="radius">The radius of the cone at its base.</param>
     /// <param name="height">The height of the cone.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="radius"/> or <paramref name="height"/> is less than or equal to zero.
+    /// </exception>
     public ConeShape(Real radius = (Real)0.5, Real height = (Real)1.0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(radius, nameof(radius));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height, nameof(height));
+
         this.radius = radius;
         this.height = height;
         UpdateWorldBoundingBox();
@@ -74,25 +71,19 @@ public class ConeShape : RigidBodyShape
 
     public override void SupportMap(in JVector direction, out JVector result)
     {
-        const Real ZeroEpsilon = (Real)1e-12;
+        const Real zeroEpsilon = (Real)1e-12;
         // cone = disk + point
 
-        // center of mass of a cone is at 0.25 height
-        JVector ndir = direction;
-        ndir.Y = (Real)0.0;
-        Real ndir2 = ndir.LengthSquared();
+        // The center of mass is at 0.25 height.
+        JVector baseDir = new JVector(direction.X, (Real)0.0, direction.Z);
+        baseDir = JVector.NormalizeSafe(baseDir, zeroEpsilon) * radius;
 
-        if (ndir2 > ZeroEpsilon)
+        baseDir.Y = -(Real)0.25 * height;
+
+        // disk support point vs. (0, 0.75 * height, 0)
+        if (JVector.Dot(direction, baseDir) >= direction.Y * (Real)0.75 * height)
         {
-            ndir *= radius / MathR.Sqrt(ndir2);
-        }
-
-        ndir.Y = -(Real)0.25 * height;
-
-        // disk support point vs (0, 0.75 * height, 0)
-        if (JVector.Dot(direction, ndir) >= direction.Y * (Real)0.75 * height)
-        {
-            result = ndir;
+            result = baseDir;
         }
         else
         {
@@ -105,9 +96,9 @@ public class ConeShape : RigidBodyShape
         point = JVector.Zero;
     }
 
-    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBBox box)
+    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBoundingBox box)
     {
-        const Real ZeroEpsilon = (Real)1e-12;
+        const Real zeroEpsilon = (Real)1e-12;
 
         JVector upa = orientation.GetBasisY();
 
@@ -121,19 +112,19 @@ public class ConeShape : RigidBodyShape
 
         Real xext = 0, yext = 0, zext = 0;
 
-        if (l1 > ZeroEpsilon)
+        if (l1 > zeroEpsilon)
         {
             Real sl = (Real)1.0 / MathR.Sqrt(l1);
             xext = (yy + zz) * sl * radius;
         }
 
-        if (l2 > ZeroEpsilon)
+        if (l2 > zeroEpsilon)
         {
             Real sl = (Real)1.0 / MathR.Sqrt(l2);
             yext = (xx + zz) * sl * radius;
         }
 
-        if (l3 > ZeroEpsilon)
+        if (l3 > zeroEpsilon)
         {
             Real sl = (Real)1.0 / MathR.Sqrt(l3);
             zext = (xx + yy) * sl * radius;
@@ -145,7 +136,7 @@ public class ConeShape : RigidBodyShape
         box.Min = p1 - new JVector(xext, yext, zext);
         box.Max = p1 + new JVector(xext, yext, zext);
 
-        JBBox.AddPointInPlace(ref box, p2);
+        JBoundingBox.AddPointInPlace(ref box, p2);
 
         box.Min += position;
         box.Max += position;

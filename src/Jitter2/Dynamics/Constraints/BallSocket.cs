@@ -1,27 +1,9 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.LinearMath;
@@ -68,8 +50,8 @@ public unsafe class BallSocket : Constraint
     {
         CheckDataSize<BallSocketData>();
 
-        iterate = &Iterate;
-        prepareForIteration = &PrepareForIteration;
+        Iterate = &IterateBallSocket;
+        PrepareForIteration = &PrepareForIterationBallSocket;
         handle = JHandle<ConstraintData>.AsHandle<BallSocketData>(Handle);
     }
 
@@ -141,7 +123,7 @@ public unsafe class BallSocket : Constraint
         }
     }
 
-    public static void PrepareForIteration(ref ConstraintData constraint, Real idt)
+    public static void PrepareForIterationBallSocket(ref ConstraintData constraint, Real idt)
     {
         ref BallSocketData data = ref Unsafe.AsRef<BallSocketData>(Unsafe.AsPointer(ref constraint));
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -194,7 +176,7 @@ public unsafe class BallSocket : Constraint
 
     public JVector Impulse => handle.Data.AccumulatedImpulse;
 
-    public static void Iterate(ref ConstraintData constraint, Real idt)
+    public static void IterateBallSocket(ref ConstraintData constraint, Real idt)
     {
         ref BallSocketData data = ref Unsafe.AsRef<BallSocketData>(Unsafe.AsPointer(ref constraint));
         ref RigidBodyData body1 = ref constraint.Body1.Data;

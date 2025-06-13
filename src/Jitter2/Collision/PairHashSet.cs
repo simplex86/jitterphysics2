@@ -1,30 +1,12 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -45,7 +27,7 @@ internal unsafe class PairHashSet : IEnumerable<PairHashSet.Pair>
 
         [FieldOffset(4)] public readonly int ID2;
 
-        public static Pair Zero = new Pair();
+        public static Pair Zero = new();
 
         public Pair(int id1, int id2)
         {
@@ -61,19 +43,13 @@ internal unsafe class PairHashSet : IEnumerable<PairHashSet.Pair>
 
         public int GetHash()
         {
-            return (ID1 + 2281 * ID2) & 0x7FFFFFFF;
+            return HashCode.Combine(ID1, ID2);
         }
     }
 
-    public struct Enumerator : IEnumerator<Pair>
+    public struct Enumerator(PairHashSet hashSet) : IEnumerator<Pair>
     {
-        private readonly PairHashSet hashSet;
         private int index = -1;
-
-        public Enumerator(PairHashSet hashSet)
-        {
-            this.hashSet = hashSet;
-        }
 
         public readonly Pair Current => hashSet.Slots[index];
 
@@ -101,7 +77,7 @@ internal unsafe class PairHashSet : IEnumerable<PairHashSet.Pair>
         }
     }
 
-    public Pair[] Slots = Array.Empty<Pair>();
+    public Pair[] Slots = [];
     private int count;
 
     // 16384*8/1024 KB = 128 KB
@@ -153,7 +129,7 @@ internal unsafe class PairHashSet : IEnumerable<PairHashSet.Pair>
         Slots = newSlots;
     }
 
-    private int FindSlot(Pair[] slots, int hash, long id)
+    private static int FindSlot(Pair[] slots, int hash, long id)
     {
         int modder = slots.Length - 1;
 
@@ -255,25 +231,25 @@ internal unsafe class PairHashSet : IEnumerable<PairHashSet.Pair>
             return false;
         }
 
-        int hash_j = slot;
+        int hashJ = slot;
 
         while (true)
         {
-            hash_j = (hash_j + 1) & modder;
+            hashJ = (hashJ + 1) & modder;
 
-            if (Slots[hash_j].ID == 0)
+            if (Slots[hashJ].ID == 0)
             {
                 break;
             }
 
-            int hash_k = Slots[hash_j].GetHash() & modder;
+            int hashK = Slots[hashJ].GetHash() & modder;
 
             // https://en.wikipedia.org/wiki/Open_addressing
-            if ((hash_j > slot && (hash_k <= slot || hash_k > hash_j)) ||
-                (hash_j < slot && hash_k <= slot && hash_k > hash_j))
+            if ((hashJ > slot && (hashK <= slot || hashK > hashJ)) ||
+                (hashJ < slot && hashK <= slot && hashK > hashJ))
             {
-                Slots[slot] = Slots[hash_j];
-                slot = hash_j;
+                Slots[slot] = Slots[hashJ];
+                slot = hashJ;
             }
         }
 

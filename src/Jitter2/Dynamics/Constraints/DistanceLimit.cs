@@ -1,28 +1,10 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.LinearMath;
@@ -73,8 +55,8 @@ public unsafe class DistanceLimit : Constraint
     {
         CheckDataSize<DistanceLimitData>();
 
-        iterate = &Iterate;
-        prepareForIteration = &PrepareForIteration;
+        Iterate = &IterateFixedAngle;
+        PrepareForIteration = &PrepareForIterationFixedAngle;
         handle = JHandle<ConstraintData>.AsHandle<DistanceLimitData>(Handle);
     }
 
@@ -186,7 +168,7 @@ public unsafe class DistanceLimit : Constraint
         }
     }
 
-    public static void PrepareForIteration(ref ConstraintData constraint, Real idt)
+    public static void PrepareForIterationFixedAngle(ref ConstraintData constraint, Real idt)
     {
         ref DistanceLimitData data = ref Unsafe.AsRef<DistanceLimitData>(Unsafe.AsPointer(ref constraint));
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -221,7 +203,7 @@ public unsafe class DistanceLimit : Constraint
         }
 
         JVector n = p2 - p1;
-        if (n.LengthSquared() != (Real)0.0) JVector.NormalizeInPlace(ref n);
+        if (n.LengthSquared() > (Real)1e-12) JVector.NormalizeInPlace(ref n);
 
         var jacobian = new Span<JVector>(Unsafe.AsPointer(ref data.J0), 4);
 
@@ -262,7 +244,7 @@ public unsafe class DistanceLimit : Constraint
 
     public Real Impulse => handle.Data.AccumulatedImpulse;
 
-    public static void Iterate(ref ConstraintData constraint, Real idt)
+    public static void IterateFixedAngle(ref ConstraintData constraint, Real idt)
     {
         ref DistanceLimitData data = ref Unsafe.AsRef<DistanceLimitData>(Unsafe.AsPointer(ref constraint));
         ref RigidBodyData body1 = ref constraint.Body1.Data;
@@ -282,7 +264,7 @@ public unsafe class DistanceLimit : Constraint
 
         Real lambda = -data.EffectiveMass * (jv + data.Bias + softnessScalar);
 
-        Real oldacc = data.AccumulatedImpulse;
+        Real oldAccumulated = data.AccumulatedImpulse;
 
         data.AccumulatedImpulse += lambda;
 
@@ -295,7 +277,7 @@ public unsafe class DistanceLimit : Constraint
             data.AccumulatedImpulse = MathR.Max(data.AccumulatedImpulse, (Real)0.0);
         }
 
-        lambda = data.AccumulatedImpulse - oldacc;
+        lambda = data.AccumulatedImpulse - oldAccumulated;
 
         body1.Velocity += body1.InverseMass * lambda * jacobian[0];
         body1.AngularVelocity += JVector.Transform(lambda * jacobian[1], body1.InverseInertiaWorld);

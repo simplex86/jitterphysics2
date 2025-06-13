@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -33,23 +16,17 @@ public static class Parallel
 {
     /// <summary>
     /// Represents a batch defined by a start index, an end index, and a batch index.
-    /// This struct is utilized in <see cref="ForBatch"/> to facilitate multi-threaded batch processing within a for-loop.
+    /// This struct is utilized in <see cref="ForBatch"/> to facilitate multithreaded batch processing within a for-loop.
     /// </summary>
-    public readonly struct Batch
+    public readonly struct Batch(int start, int end)
     {
-        public Batch(int start, int end, ushort index = 0)
-        {
-            Start = start;
-            End = end;
-        }
-
         public override string ToString()
         {
             return $"Batch(Start: {Start}, End: {End})";
         }
 
-        public readonly int Start;
-        public readonly int End;
+        public readonly int Start = start;
+        public readonly int End = end;
     }
 
     /// <summary>
@@ -99,7 +76,7 @@ public static class Parallel
         for (int i = 0; i < numTasks; i++)
         {
             GetBounds(upper - lower, numTasks, i, out int start, out int end);
-            threadPool.AddTask(action, new Batch(start + lower, end + lower, (ushort)i));
+            threadPool.AddTask(action, new Batch(start + lower, end + lower));
         }
 
         if (execute) threadPool.Execute();

@@ -1,24 +1,7 @@
 ﻿/*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -43,30 +26,30 @@ public sealed class ThreadPool
 
     private sealed class Task<T> : ITask
     {
-        public Action<T> action = null!;
-        public T parameter = default!;
+        public Action<T> Action = null!;
+        public T Parameter = default!;
 
         public void Perform()
         {
-            counter = total;
-            action(parameter);
+            _counter = _total;
+            Action(Parameter);
         }
 
         private static readonly List<Task<T>> pool = new(32);
 
-        private static volatile int counter;
-        private static volatile int total;
+        private static int _counter;
+        private static int _total;
 
         public static Task<T> GetFree()
         {
-            if (counter == 0)
+            if (_counter == 0)
             {
-                counter++;
-                total++;
+                _counter++;
+                _total++;
                 pool.Add(new Task<T>());
             }
 
-            return pool[^counter--];
+            return pool[^_counter--];
         }
     }
 
@@ -76,17 +59,17 @@ public sealed class ThreadPool
     // mainResetEvent.Wait() is a 'fallthrough' for the persistent threading model in Jitter.
     // Here the performance improvement of ManualResetEvent is mostly visible.
     private readonly ManualResetEventSlim mainResetEvent;
-    private Thread[] threads = Array.Empty<Thread>();
+    private Thread[] threads = [];
 
-    private readonly SlimBag<ITask> taskList = new();
+    private readonly SlimBag<ITask> taskList = [];
     private readonly ConcurrentQueue<ITask> taskQueue = new();
 
-    private static volatile bool running = true;
+    private volatile bool running = true;
 
     private volatile int tasksLeft;
-    internal int threadCount;
+    private int threadCount;
 
-    private static ThreadPool? instance;
+    private static ThreadPool? _instance;
 
     /// <summary>
     /// Get the number of threads used by the ThreadManager to execute
@@ -107,7 +90,7 @@ public sealed class ThreadPool
         // To avoid this issue, multi-threading is disabled when a debugger is attached on non-Windows systems.
         if (!OperatingSystem.IsWindows() && Debugger.IsAttached)
         {
-            System.Diagnostics.Debug.WriteLine(
+            Debug.WriteLine(
                 "Multi-threading disabled to prevent potential hangups: Debugger attached, " +
                 ".NET version < 9.0, non-Windows system detected.");
             initialThreadCount = 1; // Forces single-threading to avoid hangups
@@ -164,8 +147,8 @@ public sealed class ThreadPool
     public void AddTask<T>(Action<T> action, T parameter)
     {
         var instance = Task<T>.GetFree();
-        instance.action = action;
-        instance.parameter = parameter;
+        instance.Action = action;
+        instance.Parameter = parameter;
         taskList.Add(instance);
     }
 
@@ -173,7 +156,7 @@ public sealed class ThreadPool
     /// Indicates whether the <see cref="ThreadPool"/> instance is initialized.
     /// </summary>
     /// <value><c>true</c> if initialized; otherwise, <c>false</c>.</value>
-    public static bool InstanceInitialized => instance != null;
+    public static bool InstanceInitialized => _instance != null;
 
     /// <summary>
     /// Implements the singleton pattern to provide a single instance of the ThreadPool.
@@ -182,8 +165,8 @@ public sealed class ThreadPool
     {
         get
         {
-            instance ??= new ThreadPool();
-            return instance;
+            _instance ??= new ThreadPool();
+            return _instance;
         }
     }
 

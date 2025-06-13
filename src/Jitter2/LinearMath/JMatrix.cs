@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -31,17 +14,18 @@ namespace Jitter2.LinearMath;
 /// Represents a three-by-three matrix with components of type <see cref="Real"/>.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Size = 9*sizeof(Real))]
-public struct JMatrix : IEquatable<JMatrix>
+public struct JMatrix(Real m11, Real m12, Real m13, Real m21, Real m22, Real m23, Real m31, Real m32, Real m33)
+    : IEquatable<JMatrix>
 {
-    [FieldOffset(0*sizeof(Real))] public Real M11;
-    [FieldOffset(1*sizeof(Real))] public Real M21;
-    [FieldOffset(2*sizeof(Real))] public Real M31;
-    [FieldOffset(3*sizeof(Real))] public Real M12;
-    [FieldOffset(4*sizeof(Real))] public Real M22;
-    [FieldOffset(5*sizeof(Real))] public Real M32;
-    [FieldOffset(6*sizeof(Real))] public Real M13;
-    [FieldOffset(7*sizeof(Real))] public Real M23;
-    [FieldOffset(8*sizeof(Real))] public Real M33;
+    [FieldOffset(0*sizeof(Real))] public Real M11 = m11;
+    [FieldOffset(1*sizeof(Real))] public Real M21 = m21;
+    [FieldOffset(2*sizeof(Real))] public Real M31 = m31;
+    [FieldOffset(3*sizeof(Real))] public Real M12 = m12;
+    [FieldOffset(4*sizeof(Real))] public Real M22 = m22;
+    [FieldOffset(5*sizeof(Real))] public Real M32 = m32;
+    [FieldOffset(6*sizeof(Real))] public Real M13 = m13;
+    [FieldOffset(7*sizeof(Real))] public Real M23 = m23;
+    [FieldOffset(8*sizeof(Real))] public Real M33 = m33;
 
     public static readonly JMatrix Identity;
     public static readonly JMatrix Zero;
@@ -56,19 +40,6 @@ public struct JMatrix : IEquatable<JMatrix>
             M22 = (Real)1.0,
             M33 = (Real)1.0
         };
-    }
-
-    public JMatrix(Real m11, Real m12, Real m13, Real m21, Real m22, Real m23, Real m31, Real m32, Real m33)
-    {
-        M11 = m11;
-        M12 = m12;
-        M13 = m13;
-        M21 = m21;
-        M22 = m22;
-        M23 = m23;
-        M31 = m31;
-        M32 = m32;
-        M33 = m33;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -472,7 +443,7 @@ public struct JMatrix : IEquatable<JMatrix>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Real Trace()
+    public readonly Real Trace()
     {
         return M11 + M22 + M33;
     }
@@ -505,7 +476,7 @@ public struct JMatrix : IEquatable<JMatrix>
         return result;
     }
 
-    public bool Equals(JMatrix other)
+    public readonly bool Equals(JMatrix other)
     {
         return M11.Equals(other.M11) && M21.Equals(other.M21) &&
                M31.Equals(other.M31) && M12.Equals(other.M12) &&
@@ -517,30 +488,25 @@ public struct JMatrix : IEquatable<JMatrix>
     /// <summary>
     /// Returns a string representation of the <see cref="JMatrix"/>.
     /// </summary>
-    public override string ToString()
+    public readonly override string ToString()
     {
         return $"M11={M11:F6}, M12={M12:F6}, M13={M13:F6}, " +
                $"M21={M21:F6}, M22={M22:F6}, M23={M23:F6}, " +
                $"M31={M31:F6}, M32={M32:F6}, M33={M33:F6}";
     }
 
-    public override bool Equals(object? obj)
+    public readonly override bool Equals(object? obj)
     {
         return obj is JMatrix other && Equals(other);
     }
 
-    public override int GetHashCode()
+    public readonly override int GetHashCode()
     {
-        var hashCode = M11.GetHashCode();
-        hashCode ^= M21.GetHashCode();
-        hashCode ^= M31.GetHashCode();
-        hashCode ^= M12.GetHashCode();
-        hashCode ^= M22.GetHashCode();
-        hashCode ^= M32.GetHashCode();
-        hashCode ^= M13.GetHashCode();
-        hashCode ^= M23.GetHashCode();
-        hashCode ^= M33.GetHashCode();
-        return hashCode;
+        var hc = new HashCode();
+        hc.Add(M11); hc.Add(M21); hc.Add(M31);
+        hc.Add(M12); hc.Add(M22); hc.Add(M32);
+        hc.Add(M13); hc.Add(M23); hc.Add(M33);
+        return hc.ToHashCode();
     }
 
     public static bool operator ==(JMatrix left, JMatrix right)

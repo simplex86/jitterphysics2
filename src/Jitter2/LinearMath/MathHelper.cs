@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -29,51 +12,22 @@ namespace Jitter2.LinearMath;
 
 public static class MathHelper
 {
-    /*
-
-    // Given two lines return closest points on both lines
-    // Line 1: p1 + (p2 - p1)*mua
-    // Line 2: p3 + (p4 - p3)*mub
-
-    public static bool LineLineIntersect(in JVector p1, in JVector p2, in JVector p3, in JVector P4,  out JVector Pa, out JVector Pb, out Real mua, out Real mub)
-    {
-        const Real Epsilon = (Real)1e-12;
-
-        Pa = Pb = JVector.Zero;
-        mua = mub = 0;
-
-        JVector p13 = p1 - p3;
-        JVector p43 = P4 - p3;
-        JVector p21 = p2 - p1;
-
-        Real d1343 = p13 * p43;
-        Real d4321 = p43 * p21;
-        Real d1321 = p13 * p21;
-        Real d4343 = p43 * p43;
-        Real d2121 = p21 * p21;
-
-        Real denom = d2121 * d4343 - d4321 * d4321;
-        if (Math.Abs(denom) < Epsilon) return false;
-
-        Real numer = d1343 * d4321 - d1321 * d4343;
-
-        mua = numer / denom;
-        mub = (d1343 + d4321 * mua) / d4343;
-
-        Pa = p1 + (p21 * mua);
-        Pb = p3 + (p43 * mub);
-
-        return true;
-    }
-
-    */
-
+    /// <summary>
+    /// Gets the sign of <paramref name="value"/> purely from its IEEE-754 sign bit.
+    /// </summary>
+    /// <param name="value">The number to test.</param>
+    /// <returns>
+    /// <c>+1</c> when the sign bit is clear (positive, +0, or a positive-sign NaN),
+    /// <c>-1</c> when the sign bit is set (negative, −0, or a negative-sign NaN).
+    /// Never returns <c>0</c>, unlike <see cref="Math.Sign(float)"/>.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SignBit(float value)
     {
         return 1 | (BitConverter.SingleToInt32Bits(value) >> 31);
     }
 
+    /// <inheritdoc cref="SignBit(float)"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SignBit(double value)
     {
@@ -167,13 +121,14 @@ public static class MathHelper
     /// <param name="sweeps">The number of Jacobi iterations.</param>
     public static JMatrix InverseSquareRoot(JMatrix m, int sweeps = 2)
     {
-        Real phi, cp, sp;
         Unsafe.SkipInit(out JMatrix r);
 
         JMatrix rotation = JMatrix.Identity;
 
         for (int i = 0; i < sweeps; i++)
         {
+            Real phi, cp, sp;
+
             // M32
             if (MathR.Abs(m.M23) > (Real)1e-6)
             {
@@ -208,7 +163,7 @@ public static class MathHelper
             }
         }
 
-        JMatrix d = new JMatrix((Real)1.0 / MathR.Sqrt(m.M11), 0, 0,
+        JMatrix d = new((Real)1.0 / MathR.Sqrt(m.M11), 0, 0,
             0, (Real)1.0 / MathR.Sqrt(m.M22), 0,
             0, 0, (Real)1.0 / MathR.Sqrt(m.M33));
 

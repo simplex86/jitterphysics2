@@ -1,24 +1,7 @@
 /*
- * Copyright (c) Thorben Linneweber and others
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Jitter2 Physics Library
+ * (c) Thorben Linneweber and contributors
+ * SPDX-License-Identifier: MIT
  */
 
 using System;
@@ -37,11 +20,15 @@ public class CylinderShape : RigidBodyShape
     /// <summary>
     /// Gets or sets the radius of the cylinder.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="value"/> is less than or equal to zero.
+    /// </exception>
     public Real Radius
     {
         get => radius;
         set
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Radius));
             radius = value;
             UpdateWorldBoundingBox();
         }
@@ -50,23 +37,34 @@ public class CylinderShape : RigidBodyShape
     /// <summary>
     /// Gets or sets the height of the cylinder.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="value"/> is less than or equal to zero.
+    /// </exception>
     public Real Height
     {
         get => height;
         set
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Height));
             height = value;
             UpdateWorldBoundingBox();
         }
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="CylinderShape"/> class, creating a cylinder shape with the specified height and radius. The symmetry axis of the cylinder is aligned along the y-axis.
+    /// Initializes a new instance of the <see cref="CylinderShape"/> class, creating a cylinder shape with the specified
+    /// height and radius. The symmetry axis of the cylinder is aligned along the y-axis.
     /// </summary>
     /// <param name="height">The height of the cylinder.</param>
     /// <param name="radius">The radius of the cylinder at its base.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="height"/> or <paramref name="radius"/> is less than or equal to zero.
+    /// </exception>
     public CylinderShape(Real height, Real radius)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height, nameof(height));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(radius, nameof(radius));
+
         this.radius = radius;
         this.height = height;
         UpdateWorldBoundingBox();
@@ -95,7 +93,7 @@ public class CylinderShape : RigidBodyShape
         }
     }
 
-    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBBox box)
+    public override void CalculateBoundingBox(in JQuaternion orientation, in JVector position, out JBoundingBox box)
     {
         const Real zeroEpsilon = (Real)1e-12;
 
