@@ -56,6 +56,9 @@ public struct RigidBodyData
     [FieldOffset(8 + 29*sizeof(Real) + 1)]
     public bool IsStatic;
 
+    [FieldOffset(8 + 29*sizeof(Real) + 2)]
+    public bool EnableGyroscopicForces;
+
     public readonly bool IsStaticOrInactive => !IsActive || IsStatic;
 }
 
@@ -208,8 +211,6 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         }
     }
 
-    private readonly int hashCode;
-
     /// <summary>
     /// Gets or sets the world assigned to this body.
     /// </summary>
@@ -224,17 +225,6 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         SetDefaultMassInertia();
 
         RigidBodyId = World.RequestId();
-        uint h = (uint)RigidBodyId;
-
-        // The rigid body is used in hash-based data structures, provide a
-        // good hash - Thomas Wang, Jan 1997
-        h = h ^ 61 ^ (h >> 16);
-        h += h << 3;
-        h ^= h >> 4;
-        h *= 0x27d4eb2d;
-        h ^= h >> 15;
-
-        hashCode = unchecked((int)h);
 
         Data._lockFlag = 0;
     }
@@ -250,7 +240,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     }
 
     /// <summary>
-    /// Gets or sets the deactivation threshold. If the magnitudes of both the angular and linear velocity of the rigid body
+    /// Gets or sets the deactivation threshold. If the magnitudes of both the angular and linear velocity
     /// remain below the specified values for the duration of <see cref="DeactivationTime"/>, the body is deactivated.
     /// The threshold values are given in rad/s and length units/s, respectively.
     /// </summary>
@@ -266,8 +256,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => (MathR.Sqrt(inactiveThresholdAngularSq), MathR.Sqrt(inactiveThresholdLinearSq));
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value.linear, nameof(value));
-            ArgumentOutOfRangeException.ThrowIfNegative(value.angular, nameof(value));
+            ArgumentOutOfRangeException.ThrowIfNegative(value.linear, nameof(value.linear));
+            ArgumentOutOfRangeException.ThrowIfNegative(value.angular, nameof(value.angular));
 
             inactiveThresholdLinearSq = value.linear * value.linear;
             inactiveThresholdAngularSq = value.angular * value.angular;
@@ -275,17 +265,13 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     }
 
     /// <summary>
-    /// Gets or sets the damping factors for linear and angular motion.
-    /// A damping factor of 0 means the body is not damped, while 1 brings
-    /// the body to a halt immediately. Damping is applied when calling
-    /// <see cref="World.Step(Real, bool)"/>. Jitter multiplies the respective
-    /// velocity each step by 1 minus the damping factor. Note that the values
-    /// are not scaled by time; a smaller time-step in
-    /// <see cref="World.Step(Real, bool)"/> results in increased damping.
+    /// Gets or sets the damping factors for linear and angular motion. A damping factor of 0 means the body is not
+    /// damped, while 1 brings the body to a halt immediately. Damping is applied when calling
+    /// <see cref="World.Step(Real, bool)"/>. Jitter multiplies the respective velocity each step by 1 minus the damping
+    /// factor. Note that the values are not scaled by time; a smaller time-step in <see cref="World.Step(Real, bool)"/>
+    /// results in increased damping.
     /// </summary>
-    /// <remarks>
-    /// The damping factors must be within the range [0, 1].
-    /// </remarks>
+    /// <remarks>The damping factors must be within the range [0, 1].</remarks>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown if either the linear or angular damping value is less than 0 or greater than 1.
     /// </exception>
@@ -294,20 +280,15 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => ((Real)1.0 - linearDampingMultiplier, (Real)1.0 - angularDampingMultiplier);
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value.linear, nameof(value));
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(value.linear, (Real)1.0, nameof(value));
+            ArgumentOutOfRangeException.ThrowIfNegative(value.linear, nameof(value.linear));
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(value.linear, (Real)1.0, nameof(value.linear));
 
-            ArgumentOutOfRangeException.ThrowIfNegative(value.angular, nameof(value));
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(value.angular, (Real)1.0, nameof(value));
+            ArgumentOutOfRangeException.ThrowIfNegative(value.angular, nameof(value.angular));
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(value.angular, (Real)1.0, nameof(value.angular));
 
             linearDampingMultiplier = (Real)1.0 - value.linear;
             angularDampingMultiplier = (Real)1.0 - value.angular;
         }
-    }
-
-    public override int GetHashCode()
-    {
-        return hashCode;
     }
 
     private void SetDefaultMassInertia()
@@ -515,6 +496,28 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     }
 
     /// <summary>
+    /// Enables the implicit gyroscopic–torque solver for this <see cref="RigidBody"/>.
+    /// </summary>
+    /// <remarks>
+    /// When <see langword="true"/>, every sub-step performs an extra Newton iteration to solve
+    /// <c>ω × (I ω)</c> implicitly.
+    ///
+    /// The benefit becomes noticeable for bodies with a high inertia anisotropy or very fast
+    /// spin-rates. Typical examples are long, thin rods, spinning tops, propellers, and other objects
+    /// whose principal inertias differ by an order of magnitude. In those cases the flag eliminates artificial
+    /// precession.
+    /// </remarks>
+    /// <value>
+    /// <see langword="true"/> to integrate gyroscopic torque each step; otherwise
+    /// <see langword="false"/> (default).
+    /// </value>
+    public bool EnableGyroscopicForces
+    {
+        get => Data.EnableGyroscopicForces;
+        set => Data.EnableGyroscopicForces = value;
+    }
+
+    /// <summary>
     /// Adds a shape to the body.
     /// </summary>
     /// <param name="shape">The shape to be added.</param>
@@ -548,13 +551,24 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     public JVector Torque { get; set; }
 
     /// <summary>
-    /// Applies a force to the rigid body, thereby altering its velocity. This force is effective for a single frame only and is reset to zero during the next call to <see cref="World.Step(Real, bool)"/>.
+    /// Applies a force to the rigid body, thereby altering its velocity.
     /// </summary>
-    /// <param name="force">The force to be applied.</param>
-    public void AddForce(in JVector force)
+    /// <param name="force">
+    /// The force to be applied. This force is effective for a single frame only and is reset
+    /// to zero during the next call to <see cref="World.Step(Real, bool)"/>.
+    /// </param>
+    /// <param name="wakeup">
+    /// If <c>true</c> (default), the body will be activated if it is currently sleeping.
+    /// If <c>false</c>, the force is only applied if the body is already active; sleeping
+    /// bodies will remain asleep and ignore the force.
+    /// </param>
+    public void AddForce(in JVector force, bool wakeup = true)
     {
         if (IsStatic || MathHelper.CloseToZero(force)) return;
-        SetActivationState(true);
+
+        if(wakeup) SetActivationState(true);
+        else if (!IsActive) return;
+
         Force += force;
     }
 
@@ -564,12 +578,18 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </summary>
     /// <param name="force">The force to be applied.</param>
     /// <param name="position">The position where the force will be applied.</param>
+    /// <param name="wakeup">
+    /// If <c>true</c> (default), the body will be activated if it is currently sleeping.
+    /// If <c>false</c>, the force is only applied if the body is already active; sleeping
+    /// bodies will remain asleep and ignore the force.
+    /// </param>
     [ReferenceFrame(ReferenceFrame.World)]
-    public void AddForce(in JVector force, in JVector position)
+    public void AddForce(in JVector force, in JVector position, bool wakeup = true)
     {
         if (IsStatic || MathHelper.CloseToZero(force)) return;
 
-        SetActivationState(true);
+        if(wakeup) SetActivationState(true);
+        else if (!IsActive) return;
 
         ref RigidBodyData data = ref Data;
         JVector.Subtract(position, data.Position, out JVector torque);
@@ -811,7 +831,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </summary>
     public void DebugDraw(IDebugDrawer drawer)
     {
-        _debugTriangles ??= new List<JTriangle>();
+        _debugTriangles ??= [];
 
         foreach (var shape in InternalShapes)
         {

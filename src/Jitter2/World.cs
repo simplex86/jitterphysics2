@@ -5,6 +5,7 @@
  */
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -16,7 +17,7 @@ using Jitter2.Dynamics.Constraints;
 using Jitter2.LinearMath;
 using Jitter2.Unmanaged;
 
-#pragma warning disable CS8618
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor.
 
 namespace Jitter2;
 
@@ -192,16 +193,10 @@ public sealed partial class World : IDisposable
         }
     }
 
-    private JVector gravity = new(0, -(Real)9.81, 0);
-
     /// <summary>
     /// Default gravity, see also <see cref="RigidBody.AffectedByGravity"/>.
     /// </summary>
-    public JVector Gravity
-    {
-        get => gravity;
-        set => gravity = value;
-    }
+    public JVector Gravity { get; set; } = new(0, -(Real)9.81, 0);
 
     // Make this global since it is used by nearly every method called
     // in World.Step.
@@ -209,8 +204,9 @@ public sealed partial class World : IDisposable
     private int velocityRelaxations = 4;
     private int substeps = 1;
 
-    private Real substepDt = (Real)(1.0 / 100.0);
-    private Real stepDt = (Real)(1.0 / 100.0);
+    private Real stepDt = (Real)0.01;
+    private Real substepDt = (Real)0.01;
+    private Real invStepDt = (Real)100.0;
 
     /// <summary>
     /// Creates an instance of the <see cref="World"/> class with the default capacity.
@@ -382,11 +378,21 @@ public sealed partial class World : IDisposable
 
         if (body.InternalConnections.Count > 0)
         {
-            var connections = body.InternalConnections.ToArray();
+            int count = body.InternalConnections.Count;
+            var connections = ArrayPool<RigidBody>.Shared.Rent(count);
 
-            foreach (var connection in connections)
+            try
             {
-                IslandHelper.RemoveConnection(islands, body, connection);
+                body.InternalConnections.CopyTo(connections, 0);
+
+                for (int i = 0; i < count; i++)
+                {
+                    IslandHelper.RemoveConnection(islands, body, connections[i]);
+                }
+            }
+            finally
+            {
+                ArrayPool<RigidBody>.Shared.Return(connections, clearArray: true);
             }
         }
 

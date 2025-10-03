@@ -107,6 +107,7 @@ public sealed partial class World
             time = ctime;
         }
 
+        invStepDt = (Real)1.0 / stepDt;
         substepDt = dt / substeps;
         stepDt = dt;
 
@@ -176,8 +177,6 @@ public sealed partial class World
 
     private void PrepareContacts(Parallel.Batch batch)
     {
-        Real invStepDt = (Real)1.0 / stepDt;
-
         var span = memContacts.Active[batch.Start..batch.End];
 
         for (int i = 0; i < span.Length; i++)
@@ -188,13 +187,6 @@ public sealed partial class World
 
             LockTwoBody(ref b1, ref b2);
 
-            // Why step_dt and not substep_dt?
-            // The contact uses the time to calculate the bias from dt:
-            // bias = bias_factor x constraint_error / dt
-            // The contact is solved in such a way that the contact points
-            // move with 'bias' velocity along their normal after solving.
-            // Since collision detection is happening at a rate of step_dt
-            // and not substep_dt the penetration magnitude can be large.
             c.PrepareForIteration(invStepDt);
             UnlockTwoBody(ref b1, ref b2);
         }
@@ -202,8 +194,6 @@ public sealed partial class World
 
     private unsafe void PrepareSmallConstraints(Parallel.Batch batch)
     {
-        Real invStepDt = (Real)1.0 / stepDt;
-
         var span = memSmallConstraints.Active[batch.Start..batch.End];
 
         for (int i = 0; i < span.Length; i++)
@@ -224,8 +214,6 @@ public sealed partial class World
 
     private unsafe void IterateSmallConstraints(Parallel.Batch batch)
     {
-        Real invStepDt = (Real)1.0 / stepDt;
-
         var span = memSmallConstraints.Active[batch.Start..batch.End];
 
         for (int i = 0; i < span.Length; i++)
@@ -244,8 +232,6 @@ public sealed partial class World
 
     private unsafe void PrepareConstraints(Parallel.Batch batch)
     {
-        Real invStepDt = (Real)1.0 / stepDt;
-
         var span = memConstraints.Active[batch.Start..batch.End];
 
         for (int i = 0; i < span.Length; i++)
@@ -266,8 +252,6 @@ public sealed partial class World
 
     private unsafe void IterateConstraints(Parallel.Batch batch)
     {
-        Real invStepDt = (Real)1.0 / stepDt;
-
         var span = memConstraints.Active[batch.Start..batch.End];
 
         for (int i = 0; i < span.Length; i++)
@@ -478,6 +462,38 @@ public sealed partial class World
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static JVector SolveGyroscopic(in JQuaternion q, in JMatrix inertiaWorld, in JVector omega, Real dt)
+    {
+        // The equation which we solve for ω_{n+1} in this method with a single Newton iteration:
+        // I_{n+1}(ω_{n+1} - ω_{n}) + h ω_{n+1} x (I_{n+1}ω_{n+1})=0
+
+        // Based on Erin Catto’s “Numerical Methods” (GDC 2015) slides.
+        // Catto integrates the gyroscopic term in **body space** where the inertia
+        // tensor I_b is constant, then transforms the updated angular velocity ω′
+        // back to world space with the *previous* orientation R_n.
+
+        // In this implementation we keep only the world-space inverse inertia, so
+        // we solve the same implicit equation directly in **world space** using
+        //   I_w = R_n I_b R_nᵀ  (assembled from the orientation at t_n).
+        //
+        // The two approaches are algebraically equivalent:           -
+        //   • Catto:  keep I_b fixed, rotate ω′ with R_n             |
+        //   • Here:   keep I_w fixed (= R_n I_b R_nᵀ) while solving  |
+        // Both introduce the same first-order O(h) approximation - either “freeze”
+        // the inertia tensor (our method) or rotate ω′ with an orientation that is one
+        // step out of date (Catto).
+
+        JVector f = dt * (omega % JVector.Transform(omega, inertiaWorld));
+
+        JMatrix jacobian = inertiaWorld + dt * (JMatrix.CreateCrossProduct(omega) * inertiaWorld -
+                                               JMatrix.CreateCrossProduct(JVector.Transform(omega, inertiaWorld)));
+
+        if (!JMatrix.Inverse(jacobian, out var invJacobian)) return omega;
+
+        return omega - JVector.Transform(f, invJacobian);
+    }
+
     private void Integrate(Parallel.Batch batch)
     {
         var span = memRigidBodies.Active[batch.Start..batch.End];
@@ -496,6 +512,14 @@ public sealed partial class World
 
             JQuaternion quat = MathHelper.RotationQuaternion(angularVelocity, substepDt);
             rigidBody.Orientation = JQuaternion.Normalize(quat * rigidBody.Orientation);
+
+            if (!rigidBody.EnableGyroscopicForces) continue;
+
+            // Note: We do not perform a symplectic Euler update here (i.e. we calculate the new orientation
+            // from the *old* angular velocity), since the gyroscopic term does introduce instabilities.
+            // We handle the gyroscopic term with implicit Euler. This is known as the symplectic splitting method.
+            JMatrix.Inverse(rigidBody.InverseInertiaWorld, out var inertiaWorld);
+            rigidBody.AngularVelocity = SolveGyroscopic(rigidBody.Orientation, inertiaWorld, angularVelocity, substepDt);
         }
     }
 
