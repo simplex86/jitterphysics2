@@ -26,28 +26,35 @@ internal readonly record struct ClipPoint(float X, float Y)
         return X * X + Y * Y;
     }
 
-    public Vector2 ToVector2()
+    public static float Dot(in ClipPoint left, in ClipPoint right)
     {
-        return new Vector2(X, Y);
+        return left.X * right.X + left.Y * right.Y;
     }
 }
 
 internal enum ClipDebugMode
 {
-    PolygonClip,
-    SegmentAgainstPolygon,
-    SegmentAgainstSegment,
-    NoIntersection
+    PolygonVsPolygon,
+    PointVsPolygon,
+    SegmentVsPolygon,
+    SegmentVsSegment,
+    SeedFallback,
+    InvalidInput
 }
 
 internal sealed record ClipStep(
     string Title,
     string Summary,
-    ClipPoint[] InputPolygon,
-    ClipPoint[] OutputPolygon,
-    int EdgeIndex = -1,
-    ClipPoint EdgeStart = default,
-    ClipPoint EdgeEnd = default);
+    ClipPoint[] Probe,
+    ClipPoint[] Accepted,
+    ClipPoint[] ContactSet,
+    bool ConnectAccepted = false,
+    bool HasPrimaryEdge = false,
+    ClipPoint PrimaryEdgeStart = default,
+    ClipPoint PrimaryEdgeEnd = default,
+    bool HasSecondaryEdge = false,
+    ClipPoint SecondaryEdgeStart = default,
+    ClipPoint SecondaryEdgeEnd = default);
 
 internal sealed record ClipSnapshot(
     string PresetName,
@@ -56,6 +63,7 @@ internal sealed record ClipSnapshot(
     string Status,
     ClipPoint[] Left,
     ClipPoint[] Right,
+    ClipPoint[] RawContacts,
     ClipPoint[] Result,
     ClipStep[] Steps);
 
@@ -65,9 +73,12 @@ internal sealed record ClipPreset(string Name, string Description, Func<float, C
 
 internal static class ContactManifoldClipDebugger
 {
-    private const int MaxManifoldPoints = 6;
-    private const int MaxClipPoints = 12;
-    private const int FinalVertexLimit = 4;
+    private const int MaxSupportPoints = 6;
+    private const int MaxManifoldPoints = 12;
+    private const int SolverContactLimit = 4;
+    private const float DuplicatePointDistanceSq = 0.001f;
+    private const float Epsilon = 1e-3f;
+    private const float AreaSignEpsilon = 1e-6f;
 
     private static readonly ClipPoint[] polygonA =
     [
@@ -105,16 +116,16 @@ internal static class ContactManifoldClipDebugger
         return
         [
             new ClipPreset(
-                "Polygon Clip",
-                "The Sutherland-Hodgman style pass sequence used for area overlap in CollisionManifold.",
-                BuildPolygonClipFrame),
+                "Polygon vs Polygon",
+                "Shows inside-point checks plus explicit edge-edge intersections for two sampled face loops.",
+                BuildPolygonVsPolygonFrame),
             new ClipPreset(
                 "Segment vs Polygon",
-                "The linear fallback path used when one projected feature collapses to a segment.",
+                "Shows the segment-against-polygon fallback when one sampled feature collapses to a line.",
                 BuildSegmentVsPolygonFrame),
             new ClipPreset(
                 "Segment vs Segment",
-                "The segment-overlap helper used when both projected features collapse to lines.",
+                "Shows the segment helper, including the collinear overlap case used by the manifold builder.",
                 BuildSegmentVsSegmentFrame)
         ];
     }
@@ -132,123 +143,216 @@ internal static class ContactManifoldClipDebugger
             return new ClipSnapshot(
                 presetName,
                 description,
-                ClipDebugMode.NoIntersection,
-                "Both inputs need at least one point.",
+                ClipDebugMode.InvalidInput,
+                "Both sampled features need at least one point.",
                 leftInput,
                 rightInput,
+                [],
                 [],
                 [
                     new ClipStep(
                         "Invalid input",
-                        "At least one polygon was empty.",
-                        Copy(leftInput, leftInput.Length),
+                        "At least one sampled feature was empty.",
+                        [],
+                        [],
                         [])
                 ]);
         }
 
-        if (leftInput.Length > MaxClipPoints || rightInput.Length > MaxClipPoints)
+        if (leftInput.Length > MaxSupportPoints || rightInput.Length > MaxSupportPoints)
         {
             throw new ArgumentOutOfRangeException(nameof(leftInput),
-                $"This visualizer mirrors the manifold clipper limits and supports up to {MaxClipPoints} points per feature.");
+                $"This visualizer mirrors the manifold sampler and supports up to {MaxSupportPoints} support points per feature.");
         }
 
-        ClipPoint[] left = new ClipPoint[MaxClipPoints];
-        ClipPoint[] right = new ClipPoint[MaxClipPoints];
-        Array.Copy(leftInput, left, leftInput.Length);
-        Array.Copy(rightInput, right, rightInput.Length);
+        ClipPoint[] left = Copy(leftInput, leftInput.Length);
+        ClipPoint[] right = Copy(rightInput, rightInput.Length);
+        int leftCount = left.Length;
+        int rightCount = right.Length;
 
-        int leftCount = leftInput.Length;
-        int rightCount = rightInput.Length;
+        List<ClipStep> steps = [];
+        ClipPoint[] contacts = new ClipPoint[MaxManifoldPoints];
+        int rawCount = 0;
+        bool saturated = false;
 
-        CalculateClipTolerance(left, leftCount, right, rightCount,
-            out float sideEpsilon, out float distanceEpsilonSq, out float areaEpsilon);
+        float leftSign = 0.0f;
+        float rightSign = 0.0f;
+        bool leftPolygon = leftCount > 2 && TryGetPolygonSign(left, leftCount, out leftSign);
+        bool rightPolygon = rightCount > 2 && TryGetPolygonSign(right, rightCount, out rightSign);
 
-        CompactPolygon(left, ref leftCount, distanceEpsilonSq, areaEpsilon);
-        CompactPolygon(right, ref rightCount, distanceEpsilonSq, areaEpsilon);
-
-        if (leftCount > 2) NormalizeWinding(left, leftCount);
-        if (rightCount > 2) NormalizeWinding(right, rightCount);
-
-        List<ClipStep> steps =
-        [
-            new ClipStep(
-                "Projected features",
-                $"Compacted to {leftCount} and {rightCount} points before clipping.",
-                Copy(left, leftCount),
-                Copy(left, leftCount))
-        ];
-
-        ClipPoint[] clipped = new ClipPoint[MaxClipPoints];
-        int clippedCount = 0;
-        ClipDebugMode mode = ClipDebugMode.NoIntersection;
-
-        if (leftCount > 2 && rightCount > 2)
-        {
-            ClipPoint[] buffer = new ClipPoint[MaxClipPoints];
-            Array.Copy(left, clipped, leftCount);
-
-            clippedCount = ClipConvexPolygon(clipped, leftCount, right, rightCount, buffer,
-                sideEpsilon, distanceEpsilonSq, areaEpsilon, steps);
-
-            if (clippedCount > 0)
-            {
-                mode = ClipDebugMode.PolygonClip;
-            }
-        }
-
-        if (clippedCount == 0)
-        {
-            if (TryClipLinearIntersection(left, leftCount, right, rightCount,
-                    sideEpsilon, distanceEpsilonSq, areaEpsilon, clipped, out clippedCount))
-            {
-                mode = leftCount == 2 && rightCount == 2
-                    ? ClipDebugMode.SegmentAgainstSegment
-                    : ClipDebugMode.SegmentAgainstPolygon;
-
-                steps.Add(new ClipStep(
-                    "Linear fallback",
-                    $"Polygon clipping produced no area overlap, so the 1D fallback returned {clippedCount} point(s).",
-                    Copy(left, leftCount),
-                    Copy(clipped, clippedCount)));
-            }
-            else
-            {
-                steps.Add(new ClipStep(
-                    "No overlap",
-                    "Neither the polygon clipper nor the linear fallback found an intersection.",
-                    Copy(left, leftCount),
-                    []));
-            }
-        }
-
-        CompactPolygon(clipped, ref clippedCount, distanceEpsilonSq, areaEpsilon);
-        ReducePolygon(clipped, ref clippedCount);
-
-        ClipPoint[] result = Copy(clipped, clippedCount);
         steps.Add(new ClipStep(
-            "Final output",
-            clippedCount == 0
-                ? "The final clipped feature is empty."
-                : $"The final clipped feature contains {clippedCount} point(s).",
-            Copy(left, leftCount),
-            result));
+            "Classify sampled features",
+            $"{DescribeFeature('A', leftCount, leftPolygon)} {DescribeFeature('B', rightCount, rightPolygon)}",
+            [],
+            [],
+            []));
 
-        string status = mode switch
+        int insideFromRight = 0;
+        int insideFromLeft = 0;
+        int clippedFromRight = 0;
+        int clippedFromLeft = 0;
+        int segmentHits = 0;
+        int edgeHits = 0;
+
+        if (leftPolygon)
         {
-            ClipDebugMode.PolygonClip => $"{clippedCount} point(s) from polygon-vs-polygon clipping.",
-            ClipDebugMode.SegmentAgainstPolygon => $"{clippedCount} point(s) from segment-against-polygon fallback.",
-            ClipDebugMode.SegmentAgainstSegment => $"{clippedCount} point(s) from segment-against-segment fallback.",
-            _ when clippedCount == 0 => "No overlap after both the polygon and linear clipping paths.",
-            _ => $"{clippedCount} point(s) returned."
-        };
+            ClipPoint[] added = CollectInsideContacts(right, rightCount, left, leftCount, leftSign,
+                contacts, ref rawCount, out int candidateCount, out saturated);
+            insideFromRight = added.Length;
+
+            steps.Add(new ClipStep(
+                "Check B points inside A",
+                DescribeCollection("B-in-A point tests", candidateCount, added.Length),
+                Copy(right, rightCount),
+                added,
+                Copy(contacts, rawCount)));
+
+            if (saturated) goto Finalize;
+
+            if (rightCount == 2)
+            {
+                added = CollectSegmentClipContacts(right[0], right[1], left, leftCount, leftSign,
+                    contacts, ref rawCount, out candidateCount, out saturated);
+                clippedFromRight = added.Length;
+
+                steps.Add(new ClipStep(
+                    "Clip B segment against A",
+                    DescribeCollection("Segment-against-polygon fallback", candidateCount, added.Length),
+                    Copy(right, rightCount),
+                    added,
+                    Copy(contacts, rawCount),
+                    ConnectAccepted: added.Length == 2));
+
+                if (saturated) goto Finalize;
+            }
+        }
+
+        if (rightPolygon)
+        {
+            ClipPoint[] added = CollectInsideContacts(left, leftCount, right, rightCount, rightSign,
+                contacts, ref rawCount, out int candidateCount, out saturated);
+            insideFromLeft = added.Length;
+
+            steps.Add(new ClipStep(
+                "Check A points inside B",
+                DescribeCollection("A-in-B point tests", candidateCount, added.Length),
+                Copy(left, leftCount),
+                added,
+                Copy(contacts, rawCount)));
+
+            if (saturated) goto Finalize;
+
+            if (leftCount == 2)
+            {
+                added = CollectSegmentClipContacts(left[0], left[1], right, rightCount, rightSign,
+                    contacts, ref rawCount, out candidateCount, out saturated);
+                clippedFromLeft = added.Length;
+
+                steps.Add(new ClipStep(
+                    "Clip A segment against B",
+                    DescribeCollection("Segment-against-polygon fallback", candidateCount, added.Length),
+                    Copy(left, leftCount),
+                    added,
+                    Copy(contacts, rawCount),
+                    ConnectAccepted: added.Length == 2));
+
+                if (saturated) goto Finalize;
+            }
+        }
+
+        if (leftCount == 2 && rightCount == 2)
+        {
+            ClipPoint[] added = CollectSegmentIntersectionContacts(left[0], left[1], right[0], right[1],
+                contacts, ref rawCount, out int candidateCount, out saturated);
+            segmentHits = added.Length;
+
+            steps.Add(new ClipStep(
+                "Intersect sampled segments",
+                DescribeCollection("Segment-segment helper", candidateCount, added.Length),
+                [],
+                added,
+                Copy(contacts, rawCount),
+                ConnectAccepted: added.Length == 2,
+                HasPrimaryEdge: true,
+                PrimaryEdgeStart: left[0],
+                PrimaryEdgeEnd: left[1],
+                HasSecondaryEdge: true,
+                SecondaryEdgeStart: right[0],
+                SecondaryEdgeEnd: right[1]));
+
+            if (saturated) goto Finalize;
+        }
+
+        if (leftPolygon && rightPolygon)
+        {
+            ClipPoint[] added = CollectPolygonEdgeIntersections(left, leftCount, right, rightCount,
+                contacts, ref rawCount, out int candidateCount, out saturated);
+            edgeHits = added.Length;
+
+            steps.Add(new ClipStep(
+                "Intersect polygon edges",
+                DescribeCollection("Polygon edge checks", candidateCount, added.Length),
+                [],
+                added,
+                Copy(contacts, rawCount)));
+
+            if (saturated) goto Finalize;
+        }
+
+        Finalize:
+        ClipPoint[] rawContacts = Copy(contacts, rawCount);
+
+        if (saturated)
+        {
+            steps.Add(new ClipStep(
+                "Raw manifold saturated",
+                $"The raw manifold hit its {MaxManifoldPoints}-contact cap, so later feature checks were skipped.",
+                [],
+                [],
+                rawContacts));
+        }
+
+        ClipPoint[] result = [];
+
+        if (rawCount == 0)
+        {
+            steps.Add(new ClipStep(
+                "Seed fallback",
+                "No sampled feature test produced a contact in the plane. CollisionManifold would keep the original seed pair from the narrow phase.",
+                [],
+                [],
+                []));
+        }
+        else
+        {
+            ClipPoint[] reduced = Copy(rawContacts, rawCount);
+            int reducedCount = rawCount;
+            ReduceManifold(reduced, ref reducedCount);
+            result = Copy(reduced, reducedCount);
+
+            steps.Add(new ClipStep(
+                "Reduce to solver manifold",
+                reducedCount == rawCount
+                    ? $"The raw manifold already fit within the {SolverContactLimit}-contact solver limit."
+                    : $"Sorted the {rawCount} raw contact(s) around their centroid and kept {reducedCount} evenly spaced solver contacts.",
+                [],
+                result,
+                rawContacts,
+                ConnectAccepted: result.Length > 1));
+        }
+
+        ClipDebugMode mode = DetermineMode(leftPolygon, rightPolygon, leftCount, rightCount, rawCount);
+        string status = BuildStatus(rawCount, result.Length, saturated,
+            insideFromRight, insideFromLeft, clippedFromRight, clippedFromLeft, segmentHits, edgeHits);
 
         return new ClipSnapshot(
             presetName,
             description,
             mode,
             status,
-            Copy(left, leftCount),
-            Copy(right, rightCount),
+            left,
+            right,
+            rawContacts,
             result,
             steps.ToArray());
     }
@@ -257,14 +361,16 @@ internal static class ContactManifoldClipDebugger
     {
         return mode switch
         {
-            ClipDebugMode.PolygonClip => "Polygon clip",
-            ClipDebugMode.SegmentAgainstPolygon => "Segment vs polygon fallback",
-            ClipDebugMode.SegmentAgainstSegment => "Segment vs segment fallback",
-            _ => "No overlap"
+            ClipDebugMode.PolygonVsPolygon => "Polygon vs polygon",
+            ClipDebugMode.PointVsPolygon => "Point vs polygon",
+            ClipDebugMode.SegmentVsPolygon => "Segment vs polygon",
+            ClipDebugMode.SegmentVsSegment => "Segment vs segment",
+            ClipDebugMode.SeedFallback => "Seed fallback",
+            _ => "Invalid input"
         };
     }
 
-    private static ClipFrame BuildPolygonClipFrame(float time)
+    private static ClipFrame BuildPolygonVsPolygonFrame(float time)
     {
         Vector2 drift = new(
             32.0f * MathF.Sin(time * 0.85f),
@@ -323,6 +429,228 @@ internal static class ContactManifoldClipDebugger
         return transformed;
     }
 
+    private static ClipDebugMode DetermineMode(bool leftPolygon, bool rightPolygon, int leftCount, int rightCount, int rawCount)
+    {
+        if (rawCount == 0) return ClipDebugMode.SeedFallback;
+        if (leftPolygon && rightPolygon) return ClipDebugMode.PolygonVsPolygon;
+        if ((leftPolygon && rightCount == 2) || (rightPolygon && leftCount == 2)) return ClipDebugMode.SegmentVsPolygon;
+        if ((leftPolygon && rightCount == 1) || (rightPolygon && leftCount == 1) || leftPolygon || rightPolygon)
+        {
+            return ClipDebugMode.PointVsPolygon;
+        }
+
+        if (leftCount == 2 && rightCount == 2) return ClipDebugMode.SegmentVsSegment;
+        return ClipDebugMode.SeedFallback;
+    }
+
+    private static string BuildStatus(int rawCount, int solverCount, bool saturated,
+        int insideFromRight, int insideFromLeft, int clippedFromRight, int clippedFromLeft, int segmentHits, int edgeHits)
+    {
+        if (rawCount == 0)
+        {
+            return "No sampled feature produced a contact in the plane. The runtime manifold falls back to the original seed pair.";
+        }
+
+        List<string> parts = [];
+
+        if (insideFromRight > 0) parts.Add($"{insideFromRight} B-in-A point(s)");
+        if (insideFromLeft > 0) parts.Add($"{insideFromLeft} A-in-B point(s)");
+        if (clippedFromRight > 0) parts.Add($"{clippedFromRight} clipped point(s) from B's segment");
+        if (clippedFromLeft > 0) parts.Add($"{clippedFromLeft} clipped point(s) from A's segment");
+        if (segmentHits > 0) parts.Add($"{segmentHits} segment intersection point(s)");
+        if (edgeHits > 0) parts.Add($"{edgeHits} polygon edge hit(s)");
+        if (saturated) parts.Add($"raw cap {MaxManifoldPoints} reached");
+
+        string sourceSummary = parts.Count == 0
+            ? "from sampled feature checks"
+            : string.Join(", ", parts);
+
+        string reduction = solverCount == rawCount
+            ? "No reduction was needed."
+            : $"Reduced to {solverCount} solver contact(s).";
+
+        return $"{rawCount} raw contact(s): {sourceSummary}. {reduction}";
+    }
+
+    private static string DescribeFeature(char label, int count, bool polygon)
+    {
+        if (polygon)
+        {
+            return $"Feature {label} is a polygon with {count} sampled points.";
+        }
+
+        return count switch
+        {
+            1 => $"Feature {label} collapsed to a point.",
+            2 => $"Feature {label} collapsed to a segment.",
+            _ => $"Feature {label} is nearly linear, so it is treated as a non-polygon feature."
+        };
+    }
+
+    private static string DescribeCollection(string label, int candidateCount, int addedCount)
+    {
+        if (candidateCount == 0)
+        {
+            return $"{label} produced no candidates.";
+        }
+
+        if (addedCount == candidateCount)
+        {
+            return $"{label} added {addedCount} contact(s).";
+        }
+
+        if (addedCount == 0)
+        {
+            return $"{label} found {candidateCount} candidate(s), but they were all duplicates.";
+        }
+
+        return $"{label} found {candidateCount} candidate(s); {addedCount} new contact(s) survived duplicate filtering.";
+    }
+
+    private static ClipPoint[] CollectInsideContacts(ClipPoint[] probe, int probeCount,
+        ClipPoint[] polygon, int polygonCount, float sign,
+        ClipPoint[] contacts, ref int rawCount, out int candidateCount, out bool saturated)
+    {
+        List<ClipPoint> added = [];
+        candidateCount = 0;
+        saturated = false;
+
+        for (int i = 0; i < probeCount; i++)
+        {
+            ClipPoint point = probe[i];
+            if (!ContainsPoint(polygon, polygonCount, point, sign)) continue;
+
+            candidateCount += 1;
+
+            if (TryAddContact(contacts, ref rawCount, point))
+            {
+                added.Add(point);
+            }
+
+            if (rawCount == MaxManifoldPoints)
+            {
+                saturated = true;
+                break;
+            }
+        }
+
+        return added.ToArray();
+    }
+
+    private static ClipPoint[] CollectSegmentClipContacts(in ClipPoint start, in ClipPoint end,
+        ClipPoint[] polygon, int polygonCount, float sign,
+        ClipPoint[] contacts, ref int rawCount, out int candidateCount, out bool saturated)
+    {
+        ClipPoint[] clipped = new ClipPoint[2];
+        candidateCount = ClipSegmentAgainstPolygon(start, end, polygon, polygonCount, sign, clipped);
+        saturated = false;
+
+        List<ClipPoint> added = [];
+
+        for (int i = 0; i < candidateCount; i++)
+        {
+            if (TryAddContact(contacts, ref rawCount, clipped[i]))
+            {
+                added.Add(clipped[i]);
+            }
+
+            if (rawCount == MaxManifoldPoints)
+            {
+                saturated = true;
+                break;
+            }
+        }
+
+        return added.ToArray();
+    }
+
+    private static ClipPoint[] CollectSegmentIntersectionContacts(in ClipPoint startA, in ClipPoint endA,
+        in ClipPoint startB, in ClipPoint endB,
+        ClipPoint[] contacts, ref int rawCount, out int candidateCount, out bool saturated)
+    {
+        ClipPoint[] clipped = new ClipPoint[2];
+        candidateCount = IntersectSegments(startA, endA, startB, endB, clipped);
+        saturated = false;
+
+        List<ClipPoint> added = [];
+
+        for (int i = 0; i < candidateCount; i++)
+        {
+            if (TryAddContact(contacts, ref rawCount, clipped[i]))
+            {
+                added.Add(clipped[i]);
+            }
+
+            if (rawCount == MaxManifoldPoints)
+            {
+                saturated = true;
+                break;
+            }
+        }
+
+        return added.ToArray();
+    }
+
+    private static ClipPoint[] CollectPolygonEdgeIntersections(ClipPoint[] left, int leftCount,
+        ClipPoint[] right, int rightCount,
+        ClipPoint[] contacts, ref int rawCount, out int candidateCount, out bool saturated)
+    {
+        List<ClipPoint> added = [];
+        ClipPoint[] clipped = new ClipPoint[2];
+        candidateCount = 0;
+        saturated = false;
+
+        for (int i = 0; i < leftCount; i++)
+        {
+            ClipPoint startA = left[i];
+            ClipPoint endA = left[(i + 1) % leftCount];
+
+            for (int j = 0; j < rightCount; j++)
+            {
+                ClipPoint startB = right[j];
+                ClipPoint endB = right[(j + 1) % rightCount];
+
+                int clippedCount = IntersectSegments(startA, endA, startB, endB, clipped);
+                candidateCount += clippedCount;
+
+                for (int k = 0; k < clippedCount; k++)
+                {
+                    if (TryAddContact(contacts, ref rawCount, clipped[k]))
+                    {
+                        added.Add(clipped[k]);
+                    }
+
+                    if (rawCount == MaxManifoldPoints)
+                    {
+                        saturated = true;
+                        return added.ToArray();
+                    }
+                }
+            }
+        }
+
+        return added.ToArray();
+    }
+
+    private static bool TryAddContact(ClipPoint[] contacts, ref int count, in ClipPoint point)
+    {
+        if (count == MaxManifoldPoints) return false;
+        if (IsDuplicatePoint(contacts, count, point)) return false;
+
+        contacts[count++] = point;
+        return true;
+    }
+
+    private static bool IsDuplicatePoint(ClipPoint[] contacts, int count, in ClipPoint point)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            if ((contacts[i] - point).LengthSquared() < DuplicatePointDistanceSq) return true;
+        }
+
+        return false;
+    }
+
     private static ClipPoint[] Copy(ClipPoint[] source, int count)
     {
         ClipPoint[] copy = new ClipPoint[count];
@@ -330,264 +658,70 @@ internal static class ContactManifoldClipDebugger
         return copy;
     }
 
-    private static float Cross2D(in ClipPoint left, in ClipPoint right)
+    private static bool TryGetPolygonSign(ClipPoint[] polygon, int count, out float sign)
     {
-        return left.X * right.Y - left.Y * right.X;
-    }
-
-    private static float SignedArea(ClipPoint[] polygon, int count)
-    {
-        if (count < 3) return 0.0f;
-
         float area = 0.0f;
+        ClipPoint previous = polygon[count - 1];
 
         for (int i = 0; i < count; i++)
         {
             ClipPoint current = polygon[i];
-            ClipPoint next = polygon[(i + 1) % count];
-            area += Cross2D(current, next);
+            area += Cross2D(previous, current);
+            previous = current;
         }
 
-        return area;
+        if (MathF.Abs(area) <= AreaSignEpsilon)
+        {
+            sign = 0.0f;
+            return false;
+        }
+
+        sign = area < 0.0f ? -1.0f : 1.0f;
+        return true;
     }
 
-    private static void ReversePolygon(ClipPoint[] polygon, int count)
+    private static bool ContainsPoint(ClipPoint[] polygon, int count, in ClipPoint point, float sign)
     {
-        for (int i = 0, j = count - 1; i < j; i++, j--)
-        {
-            (polygon[i], polygon[j]) = (polygon[j], polygon[i]);
-        }
-    }
-
-    private static void NormalizeWinding(ClipPoint[] polygon, int count)
-    {
-        if (SignedArea(polygon, count) < 0.0f)
-        {
-            ReversePolygon(polygon, count);
-        }
-    }
-
-    private static void CalculateClipTolerance(ClipPoint[] left, int leftCount,
-        ClipPoint[] right, int rightCount,
-        out float sideEpsilon, out float distanceEpsilonSq, out float areaEpsilon)
-    {
-        float scale = 1.0f;
-
-        for (int i = 0; i < leftCount; i++)
-        {
-            scale = MathF.Max(scale, MathF.Max(MathF.Abs(left[i].X), MathF.Abs(left[i].Y)));
-        }
-
-        for (int i = 0; i < rightCount; i++)
-        {
-            scale = MathF.Max(scale, MathF.Max(MathF.Abs(right[i].X), MathF.Abs(right[i].Y)));
-        }
-
-        float distanceEpsilon = 1e-5f * scale + 1e-7f;
-        distanceEpsilonSq = distanceEpsilon * distanceEpsilon;
-        areaEpsilon = distanceEpsilon * scale;
-        sideEpsilon = areaEpsilon;
-    }
-
-    private static void CompactPolygon(ClipPoint[] polygon, ref int count, float distanceEpsilonSq, float areaEpsilon)
-    {
-        if (count == 0) return;
-
-        int write = 0;
+        ClipPoint previous = polygon[count - 1];
 
         for (int i = 0; i < count; i++)
         {
             ClipPoint current = polygon[i];
+            float side = sign * Cross2D(current - previous, point - previous);
 
-            if (write > 0 && (polygon[write - 1] - current).LengthSquared() <= distanceEpsilonSq)
-            {
-                continue;
-            }
+            if (side < -Epsilon) return false;
 
-            polygon[write++] = current;
+            previous = current;
         }
 
-        if (write > 1 && (polygon[0] - polygon[write - 1]).LengthSquared() <= distanceEpsilonSq)
-        {
-            write -= 1;
-        }
-
-        count = write;
-        if (count < 3) return;
-
-        bool removed;
-
-        do
-        {
-            removed = false;
-
-            for (int i = 0; i < count; i++)
-            {
-                ClipPoint previous = polygon[(i + count - 1) % count];
-                ClipPoint current = polygon[i];
-                ClipPoint next = polygon[(i + 1) % count];
-
-                ClipPoint edge0 = current - previous;
-                ClipPoint edge1 = next - current;
-
-                if (MathF.Abs(Cross2D(edge0, edge1)) > areaEpsilon) continue;
-
-                for (int j = i; j < count - 1; j++)
-                {
-                    polygon[j] = polygon[j + 1];
-                }
-
-                count -= 1;
-                removed = true;
-                break;
-            }
-        }
-        while (removed && count >= 3);
+        return true;
     }
 
-    private static float SideOfEdge(in ClipPoint edgeStart, in ClipPoint edgeEnd, in ClipPoint point)
-    {
-        return Cross2D(edgeEnd - edgeStart, point - edgeStart);
-    }
-
-    private static ClipPoint IntersectSegmentsAgainstEdge(in ClipPoint edgeStart, in ClipPoint edgeEnd,
-        in ClipPoint start, in ClipPoint end, float startSide, float endSide, float distanceEpsilonSq)
-    {
-        float denominator = startSide - endSide;
-
-        if (MathF.Abs(denominator) <= distanceEpsilonSq)
-        {
-            return MathF.Abs(startSide) <= MathF.Abs(endSide) ? start : end;
-        }
-
-        float t = startSide / denominator;
-        t = Math.Clamp(t, 0.0f, 1.0f);
-
-        return start + t * (end - start);
-    }
-
-    private static int ClipConvexPolygon(ClipPoint[] subject, int subjectCount,
-        ClipPoint[] clip, int clipCount, ClipPoint[] buffer,
-        float sideEpsilon, float distanceEpsilonSq, float areaEpsilon,
-        List<ClipStep> steps)
-    {
-        ClipPoint[] input = subject;
-        ClipPoint[] output = buffer;
-        int inputCount = subjectCount;
-        bool resultInSubject = true;
-
-        for (int edge = 0; edge < clipCount; edge++)
-        {
-            if (inputCount == 0) return 0;
-
-            ClipPoint[] stepInput = Copy(input, inputCount);
-            ClipPoint edgeStart = clip[edge];
-            ClipPoint edgeEnd = clip[(edge + 1) % clipCount];
-            int outputCount = 0;
-
-            ClipPoint start = input[inputCount - 1];
-            float startSide = SideOfEdge(edgeStart, edgeEnd, start);
-            bool startInside = startSide >= -sideEpsilon;
-
-            for (int i = 0; i < inputCount; i++)
-            {
-                ClipPoint end = input[i];
-                float endSide = SideOfEdge(edgeStart, edgeEnd, end);
-                bool endInside = endSide >= -sideEpsilon;
-
-                if (startInside != endInside)
-                {
-                    output[outputCount++] = IntersectSegmentsAgainstEdge(
-                        edgeStart, edgeEnd, start, end, startSide, endSide, distanceEpsilonSq);
-                }
-
-                if (endInside)
-                {
-                    output[outputCount++] = end;
-                }
-
-                start = end;
-                startSide = endSide;
-                startInside = endInside;
-            }
-
-            CompactPolygon(output, ref outputCount, distanceEpsilonSq, areaEpsilon);
-
-            steps.Add(new ClipStep(
-                $"Clip edge {edge + 1}/{clipCount}",
-                outputCount == 0
-                    ? "This edge rejected the current polygon completely."
-                    : $"This pass produced {outputCount} output point(s).",
-                stepInput,
-                Copy(output, outputCount),
-                edge,
-                edgeStart,
-                edgeEnd));
-
-            ClipPoint[] temporary = input;
-            input = output;
-            output = temporary;
-            inputCount = outputCount;
-            resultInSubject = !resultInSubject;
-        }
-
-        if (!resultInSubject)
-        {
-            Array.Copy(input, subject, inputCount);
-        }
-
-        return inputCount;
-    }
-
-    private static void StoreLinearIntersection(in ClipPoint start, in ClipPoint end,
-        float distanceEpsilonSq, ClipPoint[] clipped, out int clippedCount)
-    {
-        clipped[0] = start;
-        clippedCount = 1;
-
-        if ((end - start).LengthSquared() <= distanceEpsilonSq) return;
-
-        clipped[1] = end;
-        clippedCount = 2;
-    }
-
-    private static bool ClipSegmentAgainstPolygon(in ClipPoint segmentStart, in ClipPoint segmentEnd,
-        ClipPoint[] polygon, int polygonCount,
-        float sideEpsilon, float distanceEpsilonSq, ClipPoint[] clipped, out int clippedCount)
+    private static int ClipSegmentAgainstPolygon(in ClipPoint start, in ClipPoint end,
+        ClipPoint[] polygon, int polygonCount, float sign, ClipPoint[] clipped)
     {
         float enter = 0.0f;
         float exit = 1.0f;
-        ClipPoint delta = segmentEnd - segmentStart;
+        ClipPoint delta = end - start;
 
-        for (int edge = 0; edge < polygonCount; edge++)
+        for (int i = 0; i < polygonCount; i++)
         {
-            ClipPoint edgeStart = polygon[edge];
-            ClipPoint edgeEnd = polygon[(edge + 1) % polygonCount];
+            ClipPoint edgeStart = polygon[i];
+            ClipPoint edgeEnd = polygon[(i + 1) % polygonCount];
 
-            float startSide = SideOfEdge(edgeStart, edgeEnd, segmentStart) + sideEpsilon;
-            float endSide = SideOfEdge(edgeStart, edgeEnd, segmentEnd) + sideEpsilon;
+            float startSide = sign * Cross2D(edgeEnd - edgeStart, start - edgeStart);
+            float endSide = sign * Cross2D(edgeEnd - edgeStart, end - edgeStart);
 
-            bool startInside = startSide >= 0.0f;
-            bool endInside = endSide >= 0.0f;
+            bool startInside = startSide >= -Epsilon;
+            bool endInside = endSide >= -Epsilon;
 
-            if (!startInside && !endInside)
-            {
-                clippedCount = 0;
-                return false;
-            }
-
+            if (!startInside && !endInside) return 0;
             if (startInside && endInside) continue;
 
             float denominator = startSide - endSide;
+            if (MathF.Abs(denominator) <= Epsilon) return 0;
 
-            if (MathF.Abs(denominator) <= distanceEpsilonSq)
-            {
-                clippedCount = 0;
-                return false;
-            }
-
-            float t = startSide / denominator;
-            t = Math.Clamp(t, 0.0f, 1.0f);
+            float t = Math.Clamp(startSide / denominator, 0.0f, 1.0f);
 
             if (!startInside)
             {
@@ -598,139 +732,123 @@ internal static class ContactManifoldClipDebugger
                 exit = MathF.Min(exit, t);
             }
 
-            if (exit < enter)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            if (exit < enter) return 0;
         }
 
-        StoreLinearIntersection(segmentStart + enter * delta, segmentStart + exit * delta,
-            distanceEpsilonSq, clipped, out clippedCount);
+        clipped[0] = start + enter * delta;
+        ClipPoint exitPoint = start + exit * delta;
 
-        return true;
+        if ((exitPoint - clipped[0]).LengthSquared() < Epsilon)
+        {
+            return 1;
+        }
+
+        clipped[1] = exitPoint;
+        return 2;
     }
 
-    private static bool IntersectSegments(in ClipPoint leftStart, in ClipPoint leftEnd,
-        in ClipPoint rightStart, in ClipPoint rightEnd,
-        float sideEpsilon, float distanceEpsilonSq, float areaEpsilon,
-        ClipPoint[] clipped, out int clippedCount)
+    private static int IntersectSegments(in ClipPoint startA, in ClipPoint endA,
+        in ClipPoint startB, in ClipPoint endB, ClipPoint[] clipped)
     {
-        ClipPoint leftDelta = leftEnd - leftStart;
-        ClipPoint rightDelta = rightEnd - rightStart;
-        ClipPoint offset = rightStart - leftStart;
+        ClipPoint deltaA = endA - startA;
+        ClipPoint deltaB = endB - startB;
+        ClipPoint offset = startB - startA;
 
-        float cross = Cross2D(leftDelta, rightDelta);
-        const float parameterEpsilon = 1e-5f;
+        float cross = Cross2D(deltaA, deltaB);
 
-        if (MathF.Abs(cross) <= areaEpsilon)
+        if (MathF.Abs(cross) <= Epsilon)
         {
-            if (MathF.Abs(Cross2D(offset, leftDelta)) > areaEpsilon)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            if (MathF.Abs(Cross2D(offset, deltaA)) > Epsilon) return 0;
 
-            bool useLeft = leftDelta.LengthSquared() >= rightDelta.LengthSquared();
-            ClipPoint baseStart = useLeft ? leftStart : rightStart;
-            ClipPoint baseDelta = useLeft ? leftDelta : rightDelta;
+            float lengthASquared = deltaA.LengthSquared();
+            float lengthBSquared = deltaB.LengthSquared();
 
-            bool useXAxis = MathF.Abs(baseDelta.X) >= MathF.Abs(baseDelta.Y);
-            float baseOrigin = useXAxis ? baseStart.X : baseStart.Y;
-            float baseExtent = useXAxis ? baseDelta.X : baseDelta.Y;
+            if (lengthASquared <= Epsilon || lengthBSquared <= Epsilon) return 0;
 
-            if (MathF.Abs(baseExtent) <= sideEpsilon)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            float parameterB0 = ClipPoint.Dot(startB - startA, deltaA) / lengthASquared;
+            float parameterB1 = ClipPoint.Dot(endB - startA, deltaA) / lengthASquared;
 
-            float leftMin = MathF.Min(useXAxis ? leftStart.X : leftStart.Y, useXAxis ? leftEnd.X : leftEnd.Y);
-            float leftMax = MathF.Max(useXAxis ? leftStart.X : leftStart.Y, useXAxis ? leftEnd.X : leftEnd.Y);
-            float rightMin = MathF.Min(useXAxis ? rightStart.X : rightStart.Y, useXAxis ? rightEnd.X : rightEnd.Y);
-            float rightMax = MathF.Max(useXAxis ? rightStart.X : rightStart.Y, useXAxis ? rightEnd.X : rightEnd.Y);
+            float enter = MathF.Max(0.0f, MathF.Min(parameterB0, parameterB1));
+            float exit = MathF.Min(1.0f, MathF.Max(parameterB0, parameterB1));
 
-            float overlapMin = MathF.Max(leftMin, rightMin);
-            float overlapMax = MathF.Min(leftMax, rightMax);
+            if (exit < enter - Epsilon) return 0;
 
-            if (overlapMax + sideEpsilon < overlapMin)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            clipped[0] = startA + enter * deltaA;
+            ClipPoint exitPoint = startA + exit * deltaA;
 
-            float t0 = (overlapMin - baseOrigin) / baseExtent;
-            float t1 = (overlapMax - baseOrigin) / baseExtent;
+            if ((exitPoint - clipped[0]).LengthSquared() <= Epsilon) return 1;
 
-            StoreLinearIntersection(baseStart + t0 * baseDelta, baseStart + t1 * baseDelta,
-                distanceEpsilonSq, clipped, out clippedCount);
-
-            return true;
+            clipped[1] = exitPoint;
+            return 2;
         }
 
-        float t = Cross2D(offset, rightDelta) / cross;
-        float u = Cross2D(offset, leftDelta) / cross;
+        float t = Cross2D(offset, deltaB) / cross;
+        float u = Cross2D(offset, deltaA) / cross;
 
-        if (t < -parameterEpsilon || t > 1.0f + parameterEpsilon ||
-            u < -parameterEpsilon || u > 1.0f + parameterEpsilon)
+        if (t < -Epsilon || t > 1.0f + Epsilon ||
+            u < -Epsilon || u > 1.0f + Epsilon)
         {
-            clippedCount = 0;
-            return false;
+            return 0;
         }
 
         t = Math.Clamp(t, 0.0f, 1.0f);
-        clipped[0] = leftStart + t * leftDelta;
-        clippedCount = 1;
+        clipped[0] = startA + t * deltaA;
 
-        return true;
+        return 1;
     }
 
-    private static bool TryClipLinearIntersection(ClipPoint[] left, int leftCount,
-        ClipPoint[] right, int rightCount,
-        float sideEpsilon, float distanceEpsilonSq, float areaEpsilon,
-        ClipPoint[] clipped, out int clippedCount)
+    private static void ReduceManifold(ClipPoint[] contacts, ref int count)
     {
-        if (leftCount < 2 || rightCount < 2)
+        if (count <= SolverContactLimit) return;
+
+        ClipPoint centroid = new(0.0f, 0.0f);
+
+        for (int i = 0; i < count; i++)
         {
-            clippedCount = 0;
-            return false;
+            centroid += contacts[i];
         }
 
-        if (leftCount == 2 && rightCount == 2)
+        centroid = (1.0f / count) * centroid;
+
+        float[] angles = new float[count];
+        int[] order = new int[count];
+
+        for (int i = 0; i < count; i++)
         {
-            return IntersectSegments(left[0], left[1], right[0], right[1],
-                sideEpsilon, distanceEpsilonSq, areaEpsilon, clipped, out clippedCount);
+            ClipPoint delta = contacts[i] - centroid;
+            angles[i] = MathF.Atan2(delta.Y, delta.X);
+            order[i] = i;
         }
 
-        if (leftCount == 2)
+        for (int i = 1; i < count; i++)
         {
-            return ClipSegmentAgainstPolygon(left[0], left[1], right, rightCount,
-                sideEpsilon, distanceEpsilonSq, clipped, out clippedCount);
+            int current = order[i];
+            float currentAngle = angles[current];
+            int j = i - 1;
+
+            while (j >= 0 && angles[order[j]] > currentAngle)
+            {
+                order[j + 1] = order[j];
+                j--;
+            }
+
+            order[j + 1] = current;
         }
 
-        if (rightCount == 2)
+        ClipPoint[] reduced = new ClipPoint[SolverContactLimit];
+
+        for (int i = 0; i < SolverContactLimit; i++)
         {
-            return ClipSegmentAgainstPolygon(right[0], right[1], left, leftCount,
-                sideEpsilon, distanceEpsilonSq, clipped, out clippedCount);
+            int selected = order[((2 * i + 1) * count) / (2 * SolverContactLimit)];
+            reduced[i] = contacts[selected];
         }
 
-        clippedCount = 0;
-        return false;
+        Array.Copy(reduced, contacts, SolverContactLimit);
+        count = SolverContactLimit;
     }
 
-    private static void ReducePolygon(ClipPoint[] polygon, ref int count)
+    private static float Cross2D(in ClipPoint left, in ClipPoint right)
     {
-        if (count <= FinalVertexLimit) return;
-
-        ClipPoint[] reduced = new ClipPoint[FinalVertexLimit];
-
-        for (int i = 0; i < FinalVertexLimit; i++)
-        {
-            int index = ((2 * i + 1) * count) / (2 * FinalVertexLimit);
-            reduced[i] = polygon[index];
-        }
-
-        Array.Copy(reduced, polygon, FinalVertexLimit);
-        count = FinalVertexLimit;
+        return left.X * right.Y - left.Y * right.X;
     }
 }

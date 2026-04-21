@@ -15,10 +15,13 @@ internal static class Program
     private static readonly Color SubjectStroke = new(35, 101, 176, 255);
     private static readonly Color ClipFill = new(230, 142, 33, 64);
     private static readonly Color ClipStroke = new(230, 142, 33, 255);
+    private static readonly Color RawContactFill = new(61, 129, 96, 84);
+    private static readonly Color RawContactStroke = new(61, 129, 96, 255);
     private static readonly Color OutputFill = new(37, 151, 92, 88);
     private static readonly Color OutputStroke = new(37, 151, 92, 255);
     private static readonly Color InputStroke = new(118, 128, 140, 255);
     private static readonly Color CurrentEdge = new(198, 61, 63, 255);
+    private static readonly Color SecondaryEdge = new(157, 108, 38, 255);
 
     private static int presetIndex;
     private static int stepIndex;
@@ -30,7 +33,7 @@ internal static class Program
     private static void Main()
     {
         Raylib.SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.Msaa4xHint);
-        Raylib.InitWindow(1500, 940, "Jitter2 ContactManifold Clipping Visualizer");
+        Raylib.InitWindow(1500, 940, "Jitter2 ContactManifold Visualizer");
         Raylib.SetTargetFPS(60);
 
         var presets = ContactManifoldClipDebugger.CreatePresets();
@@ -167,13 +170,13 @@ internal static class Program
 
         DrawHeader(snapshot);
 
-        DrawPanel(leftPanel, "Projected Inputs");
-        DrawPanel(centerPanel, "Current Pass");
-        DrawPanel(rightPanel, "Final Output");
+        DrawPanel(leftPanel, "Sampled Features");
+        DrawPanel(centerPanel, "Current Step");
+        DrawPanel(rightPanel, "Solver Manifold");
 
-        DrawGeometryPanel(leftPanel, bounds, snapshot.Left, snapshot.Right, snapshot.Result);
+        DrawInputPanel(leftPanel, bounds, snapshot);
         DrawStepPanel(centerPanel, bounds, snapshot, step);
-        DrawResultPanel(rightPanel, bounds, snapshot.Left, snapshot.Right, snapshot.Result);
+        DrawResultPanel(rightPanel, bounds, snapshot);
 
         DrawFooter(snapshot);
     }
@@ -183,7 +186,7 @@ internal static class Program
         Raylib.DrawText(snapshot.PresetName, 28, 18, 34, Ink);
         Raylib.DrawText(snapshot.Description, 28, 57, 22, Muted);
 
-        string source = "Mirrors the 2D clipping helpers in src/Jitter2/Collision/NarrowPhase/CollisionManifold.cs";
+        string source = "Mirrors the current sampled-feature manifold builder in src/Jitter2/Collision/NarrowPhase/CollisionManifold.cs";
         Raylib.DrawText(source, 28, 85, 18, Muted);
 
         string status = $"{ContactManifoldClipDebugger.GetModeLabel(snapshot.Mode)} | {snapshot.Status}";
@@ -207,22 +210,18 @@ internal static class Program
         Raylib.DrawText(title, (int)rect.X + 16, (int)rect.Y + 12, 24, Ink);
     }
 
-    private static void DrawGeometryPanel(Rectangle rect, WorldBounds bounds, ClipPoint[] left, ClipPoint[] right, ClipPoint[] result)
+    private static void DrawInputPanel(Rectangle rect, WorldBounds bounds, ClipSnapshot snapshot)
     {
         Rectangle plot = GetPlotRect(rect);
 
         DrawGrid(plot, bounds);
-        DrawShape(plot, bounds, left, SubjectFill, SubjectStroke, 2.4f);
-        DrawShape(plot, bounds, right, ClipFill, ClipStroke, 2.4f);
+        DrawFeature(plot, bounds, snapshot.Left, snapshot.Left.Length > 2, SubjectFill, SubjectStroke, 2.4f);
+        DrawFeature(plot, bounds, snapshot.Right, snapshot.Right.Length > 2, ClipFill, ClipStroke, 2.4f);
+        DrawContacts(plot, bounds, snapshot.RawContacts, RawContactFill, RawContactStroke, false, 5.6f, 2.4f);
 
-        if (result.Length > 0)
-        {
-            DrawShape(plot, bounds, result, Raylib.Fade(OutputFill, 0.70f), OutputStroke, 2.2f);
-        }
-
-        DrawLegend((int)rect.X + 16, (int)rect.Y + 46, SubjectStroke, "subject");
-        DrawLegend((int)rect.X + 124, (int)rect.Y + 46, ClipStroke, "clip");
-        DrawLegend((int)rect.X + 206, (int)rect.Y + 46, OutputStroke, "result");
+        DrawLegend((int)rect.X + 16, (int)rect.Y + 46, SubjectStroke, "shape A");
+        DrawLegend((int)rect.X + 126, (int)rect.Y + 46, ClipStroke, "shape B");
+        DrawLegend((int)rect.X + 236, (int)rect.Y + 46, RawContactStroke, "raw contacts");
     }
 
     private static void DrawStepPanel(Rectangle rect, WorldBounds bounds, ClipSnapshot snapshot, ClipStep step)
@@ -230,38 +229,68 @@ internal static class Program
         Rectangle plot = GetPlotRect(rect);
         DrawGrid(plot, bounds);
 
-        DrawShape(plot, bounds, snapshot.Right, ClipFill, ClipStroke, 2.2f);
-        DrawShape(plot, bounds, step.InputPolygon, new Color(160, 166, 175, 34), InputStroke, 2.2f);
-        DrawShape(plot, bounds, step.OutputPolygon, OutputFill, OutputStroke, 2.6f);
+        DrawFeature(plot, bounds, snapshot.Left, snapshot.Left.Length > 2,
+            new Color(0, 0, 0, 0), Raylib.Fade(SubjectStroke, 0.55f), 2.0f);
+        DrawFeature(plot, bounds, snapshot.Right, snapshot.Right.Length > 2,
+            new Color(0, 0, 0, 0), Raylib.Fade(ClipStroke, 0.55f), 2.0f);
 
-        if (step.EdgeIndex >= 0)
+        if (step.HasSecondaryEdge)
         {
-            DrawEdge(plot, bounds, step.EdgeStart, step.EdgeEnd, CurrentEdge, 4.0f);
+            DrawEdge(plot, bounds, step.SecondaryEdgeStart, step.SecondaryEdgeEnd, SecondaryEdge, 4.0f);
+        }
+
+        if (step.HasPrimaryEdge)
+        {
+            DrawEdge(plot, bounds, step.PrimaryEdgeStart, step.PrimaryEdgeEnd, CurrentEdge, 4.0f);
+        }
+
+        if (step.ContactSet.Length > 0)
+        {
+            DrawContacts(plot, bounds, step.ContactSet,
+                Raylib.Fade(RawContactFill, 0.95f), RawContactStroke, false, 5.4f, 2.0f);
+        }
+
+        if (step.Probe.Length > 0)
+        {
+            DrawFeature(plot, bounds, step.Probe, step.Probe.Length > 2,
+                new Color(0, 0, 0, 0), InputStroke, 2.6f);
+        }
+
+        if (step.Accepted.Length > 0)
+        {
+            DrawContacts(plot, bounds, step.Accepted, OutputFill, OutputStroke,
+                step.ConnectAccepted, 6.4f, 3.0f);
         }
 
         int textX = (int)rect.X + 16;
-        int textY = (int)(rect.Y + rect.Height) - 88;
+        int textY = (int)(rect.Y + rect.Height) - 104;
         Raylib.DrawText(step.Title, textX, textY, 22, Ink);
         Raylib.DrawText(step.Summary, textX, textY + 28, 18, Muted);
     }
 
-    private static void DrawResultPanel(Rectangle rect, WorldBounds bounds, ClipPoint[] left, ClipPoint[] right, ClipPoint[] result)
+    private static void DrawResultPanel(Rectangle rect, WorldBounds bounds, ClipSnapshot snapshot)
     {
         Rectangle plot = GetPlotRect(rect);
         DrawGrid(plot, bounds);
 
-        DrawShape(plot, bounds, left, new Color(0, 0, 0, 0), SubjectStroke, 2.0f);
-        DrawShape(plot, bounds, right, new Color(0, 0, 0, 0), ClipStroke, 2.0f);
-        DrawShape(plot, bounds, result, OutputFill, OutputStroke, 3.0f);
+        DrawFeature(plot, bounds, snapshot.Left, snapshot.Left.Length > 2,
+            new Color(0, 0, 0, 0), Raylib.Fade(SubjectStroke, 0.5f), 1.8f);
+        DrawFeature(plot, bounds, snapshot.Right, snapshot.Right.Length > 2,
+            new Color(0, 0, 0, 0), Raylib.Fade(ClipStroke, 0.5f), 1.8f);
+        DrawContacts(plot, bounds, snapshot.RawContacts,
+            Raylib.Fade(RawContactFill, 0.95f), RawContactStroke, false, 5.4f, 2.0f);
+        DrawContacts(plot, bounds, snapshot.Result, OutputFill, OutputStroke, snapshot.Result.Length > 1, 6.8f, 3.0f);
 
-        string label = result.Length switch
+        string label = snapshot.Result.Length switch
         {
-            0 => "empty result",
-            1 => "point contact",
-            2 => "line overlap",
-            _ => "area overlap"
+            0 => "runtime uses the seed pair",
+            1 => "1 solver contact",
+            _ => $"{snapshot.Result.Length} solver contacts"
         };
 
+        string detail = $"{snapshot.RawContacts.Length} raw candidate(s)";
+
+        Raylib.DrawText(detail, (int)rect.X + 16, (int)(rect.Y + rect.Height) - 82, 18, Muted);
         Raylib.DrawText(label, (int)rect.X + 16, (int)(rect.Y + rect.Height) - 54, 20, Ink);
     }
 
@@ -286,21 +315,22 @@ internal static class Program
 
     private static Rectangle GetPlotRect(Rectangle panel)
     {
-        return new Rectangle(panel.X + 14.0f, panel.Y + 78.0f, panel.Width - 28.0f, panel.Height - 166.0f);
+        return new Rectangle(panel.X + 14.0f, panel.Y + 78.0f, panel.Width - 28.0f, panel.Height - 182.0f);
     }
 
-    private static void DrawShape(Rectangle plot, WorldBounds bounds, ClipPoint[] polygon, Color fill, Color stroke, float thickness)
+    private static void DrawFeature(Rectangle plot, WorldBounds bounds, ClipPoint[] feature,
+        bool closeLoop, Color fill, Color stroke, float thickness)
     {
-        if (polygon.Length == 0) return;
+        if (feature.Length == 0) return;
 
-        Vector2[] vertices = new Vector2[polygon.Length];
+        Vector2[] vertices = new Vector2[feature.Length];
 
-        for (int i = 0; i < polygon.Length; i++)
+        for (int i = 0; i < feature.Length; i++)
         {
-            vertices[i] = WorldToScreen(plot, bounds, polygon[i]);
+            vertices[i] = WorldToScreen(plot, bounds, feature[i]);
         }
 
-        if (polygon.Length >= 3 && fill.A > 0)
+        if (closeLoop && feature.Length >= 3 && fill.A > 0)
         {
             for (int i = 1; i < vertices.Length - 1; i++)
             {
@@ -308,7 +338,7 @@ internal static class Program
             }
         }
 
-        if (polygon.Length == 1)
+        if (feature.Length == 1)
         {
             Raylib.DrawCircleV(vertices[0], 6.0f, stroke);
             return;
@@ -319,7 +349,7 @@ internal static class Program
             Raylib.DrawLineEx(vertices[i], vertices[i + 1], thickness, stroke);
         }
 
-        if (polygon.Length >= 3)
+        if (closeLoop && feature.Length >= 3)
         {
             Raylib.DrawLineEx(vertices[^1], vertices[0], thickness, stroke);
         }
@@ -328,6 +358,39 @@ internal static class Program
         {
             Raylib.DrawCircleV(vertex, 4.5f, stroke);
             Raylib.DrawCircleV(vertex, 2.2f, PanelFill);
+        }
+    }
+
+    private static void DrawContacts(Rectangle plot, WorldBounds bounds, ClipPoint[] contacts,
+        Color fill, Color stroke, bool connect, float radius, float thickness)
+    {
+        if (contacts.Length == 0) return;
+
+        Vector2[] vertices = new Vector2[contacts.Length];
+
+        for (int i = 0; i < contacts.Length; i++)
+        {
+            vertices[i] = WorldToScreen(plot, bounds, contacts[i]);
+        }
+
+        if (connect && contacts.Length > 1)
+        {
+            for (int i = 0; i < vertices.Length - 1; i++)
+            {
+                Raylib.DrawLineEx(vertices[i], vertices[i + 1], thickness, stroke);
+            }
+
+            if (contacts.Length > 2)
+            {
+                Raylib.DrawLineEx(vertices[^1], vertices[0], thickness, stroke);
+            }
+        }
+
+        foreach (Vector2 vertex in vertices)
+        {
+            Raylib.DrawCircleV(vertex, radius, fill);
+            Raylib.DrawCircleV(vertex, radius - 1.8f, stroke);
+            Raylib.DrawCircleV(vertex, radius - 3.4f, PanelFill);
         }
     }
 
@@ -360,14 +423,22 @@ internal static class Program
 
         Expand(ref bounds, snapshot.Left);
         Expand(ref bounds, snapshot.Right);
+        Expand(ref bounds, snapshot.RawContacts);
         Expand(ref bounds, snapshot.Result);
-        Expand(ref bounds, step.InputPolygon);
-        Expand(ref bounds, step.OutputPolygon);
+        Expand(ref bounds, step.Probe);
+        Expand(ref bounds, step.Accepted);
+        Expand(ref bounds, step.ContactSet);
 
-        if (step.EdgeIndex >= 0)
+        if (step.HasPrimaryEdge)
         {
-            Expand(ref bounds, step.EdgeStart);
-            Expand(ref bounds, step.EdgeEnd);
+            Expand(ref bounds, step.PrimaryEdgeStart);
+            Expand(ref bounds, step.PrimaryEdgeEnd);
+        }
+
+        if (step.HasSecondaryEdge)
+        {
+            Expand(ref bounds, step.SecondaryEdgeStart);
+            Expand(ref bounds, step.SecondaryEdgeEnd);
         }
 
         if (bounds.MinX == float.MaxValue)
