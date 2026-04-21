@@ -13,58 +13,35 @@ using Jitter2.LinearMath;
 namespace Jitter2.Collision;
 
 /// <summary>
-/// Represents a contact manifold between two convex shapes, storing up to six contact points.
+/// Represents a contact manifold between two convex shapes.
 /// </summary>
 /// <remarks>
-/// The manifold is constructed by projecting support points along perturbed normals
-/// in a hexagonal pattern around the collision normal, then clipping to find the contact region.
+/// The manifold is constructed from support points sampled around the collision normal,
+/// then reduced to a small contact set suitable for the solver.
 /// </remarks>
 public unsafe struct CollisionManifold
 {
-    private readonly struct ClipPoint
-    {
-        public readonly Real X;
-        public readonly Real Y;
+    // We sample each shape with six perturbed support directions, but the sampled polygons can
+    // intersect in up to twelve vertices before the solver-facing reduction step.
+    private const int MaxSupportPoints = 6;
+    private const int MaxManifoldPoints = 12;
+    private const int SolverContactLimit = 4;
+    private const Real DuplicatePointDistanceSq = (Real)0.001;
 
-        public ClipPoint(Real x, Real y)
-        {
-            X = x;
-            Y = y;
-        }
+    // Layout: MaxManifoldPoints on shape A followed by the matching points on shape B.
+    private fixed Real manifoldData[MaxManifoldPoints * 2 * 3];
 
-        public static ClipPoint operator +(ClipPoint left, ClipPoint right)
-        {
-            return new ClipPoint(left.X + right.X, left.Y + right.Y);
-        }
-
-        public static ClipPoint operator -(ClipPoint left, ClipPoint right)
-        {
-            return new ClipPoint(left.X - right.X, left.Y - right.Y);
-        }
-
-        public static ClipPoint operator *(Real scale, ClipPoint point)
-        {
-            return new ClipPoint(scale * point.X, scale * point.Y);
-        }
-
-        public readonly Real LengthSquared()
-        {
-            return X * X + Y * Y;
-        }
-    }
-
-    private fixed Real manifoldData[12*3];
-
+    // Number of sampled support points collected for each shape.
     private int leftCount;
     private int rightCount;
+    // Number of actual contact pairs written into manifoldData.
     private int manifoldCount;
 
-    private const int MaxManifoldPoints = 6;
-    private const int MaxClipPoints = 12;
-    private const int SolverContactLimit = 4;
     private const Real Sqrt3Over2 = (Real)0.86602540378;
+    // Small perturbation used to sample support points around the contact normal.
     private const Real Perturbation = (Real)0.01;
 
+    // Unit hexagon around the normal. These offsets generate the six support directions.
     private static readonly Real[] hexagonVertices = [(Real)1.0, (Real)0.0, (Real)0.5, Sqrt3Over2, -(Real)0.5, Sqrt3Over2,
         -(Real)1.0, (Real)0.0, -(Real)0.5, -Sqrt3Over2, (Real)0.5, -Sqrt3Over2];
 
@@ -76,312 +53,121 @@ public unsafe struct CollisionManifold
     /// <summary>
     /// Gets a span of contact points on shape B. Valid indices are <c>[0, Count)</c>.
     /// </summary>
-    public Span<JVector> ManifoldB => MemoryMarshal.CreateSpan(ref Unsafe.As<Real, JVector>(ref manifoldData[18]), MaxManifoldPoints);
+    public Span<JVector> ManifoldB => MemoryMarshal.CreateSpan(ref Unsafe.As<Real, JVector>(ref manifoldData[MaxManifoldPoints * 3]), MaxManifoldPoints);
 
     /// <summary>
     /// Gets the number of contact points in the manifold.
     /// </summary>
     public readonly int Count => manifoldCount;
 
+    // Add a support sample for shape A unless it is effectively identical to one we already kept.
     private void PushLeft(Span<JVector> left, in JVector v)
     {
-        const Real epsilon = (Real)0.001;
-
         if (leftCount > 0)
         {
-            if ((left[0] - v).LengthSquared() < epsilon) return;
+            if ((left[0] - v).LengthSquared() < DuplicatePointDistanceSq) return;
         }
 
         if (leftCount > 1)
         {
-            if ((left[leftCount - 1] - v).LengthSquared() < epsilon) return;
+            if ((left[leftCount - 1] - v).LengthSquared() < DuplicatePointDistanceSq) return;
         }
 
         left[leftCount++] = v;
     }
 
+    // Add a support sample for shape B unless it is effectively identical to one we already kept.
     private void PushRight(Span<JVector> right, in JVector v)
     {
-        const Real epsilon = (Real)0.001;
-
         if (rightCount > 0)
         {
-            if ((right[0] - v).LengthSquared() < epsilon) return;
+            if ((right[0] - v).LengthSquared() < DuplicatePointDistanceSq) return;
         }
 
         if (rightCount > 1)
         {
-            if ((right[rightCount - 1] - v).LengthSquared() < epsilon) return;
+            if ((right[rightCount - 1] - v).LengthSquared() < DuplicatePointDistanceSq) return;
         }
 
         right[rightCount++] = v;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Real Cross2D(in ClipPoint left, in ClipPoint right)
+    // Determine the winding sign of a sampled polygon relative to the contact normal.
+    // If the area is near zero, the sample degenerated to a segment or point.
+    private static bool TryGetPolygonSign(ReadOnlySpan<JVector> polygon, int count, in JVector normal, out Real sign)
     {
-        return left.X * right.Y - left.Y * right.X;
-    }
-
-    private static void StoreLinearIntersection(in ClipPoint start, in ClipPoint end,
-        Real distanceEpsilonSq, Span<ClipPoint> clipped, out int clippedCount)
-    {
-        clipped[0] = start;
-        clippedCount = 1;
-
-        if ((end - start).LengthSquared() <= distanceEpsilonSq) return;
-
-        clipped[1] = end;
-        clippedCount = 2;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ClipPoint ProjectToPlane(in JVector point, in JVector origin, in JVector tangent1, in JVector tangent2)
-    {
-        JVector delta = point - origin;
-        return new ClipPoint(JVector.Dot(delta, tangent1), JVector.Dot(delta, tangent2));
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static JVector LiftFromPlane(in ClipPoint point, in JVector origin, in JVector tangent1, in JVector tangent2)
-    {
-        return origin + point.X * tangent1 + point.Y * tangent2;
-    }
-
-    private static Real SignedArea(ReadOnlySpan<ClipPoint> polygon, int count)
-    {
-        if (count < 3) return (Real)0.0;
+        const Real epsilon = (Real)1e-6;
 
         Real area = (Real)0.0;
-
-        ClipPoint previous = polygon[count - 1];
+        JVector previous = polygon[count - 1];
 
         for (int i = 0; i < count; i++)
         {
-            ClipPoint current = polygon[i];
-            area += Cross2D(previous, current);
+            JVector current = polygon[i];
+            area += JVector.Dot(previous % current, normal);
             previous = current;
         }
 
-        return area;
-    }
-
-    private static void ReversePolygon(Span<ClipPoint> polygon, int count)
-    {
-        for (int i = 0, j = count - 1; i < j; i++, j--)
+        if (MathR.Abs(area) <= epsilon)
         {
-            (polygon[i], polygon[j]) = (polygon[j], polygon[i]);
-        }
-    }
-
-    private static void NormalizeWinding(Span<ClipPoint> polygon, int count)
-    {
-        if (SignedArea(polygon, count) < (Real)0.0)
-        {
-            ReversePolygon(polygon, count);
-        }
-    }
-
-    private static void CalculateClipTolerance(ReadOnlySpan<ClipPoint> left, int leftCount,
-        ReadOnlySpan<ClipPoint> right, int rightCount,
-        out Real sideEpsilon, out Real distanceEpsilonSq, out Real areaEpsilon)
-    {
-        Real scale = (Real)1.0;
-
-        for (int i = 0; i < leftCount; i++)
-        {
-            scale = MathR.Max(scale, MathR.Max(MathR.Abs(left[i].X), MathR.Abs(left[i].Y)));
+            sign = (Real)0.0;
+            return false;
         }
 
-        for (int i = 0; i < rightCount; i++)
-        {
-            scale = MathR.Max(scale, MathR.Max(MathR.Abs(right[i].X), MathR.Abs(right[i].Y)));
-        }
-
-        Real distanceEpsilon = (Real)1e-5 * scale + (Real)1e-7;
-        distanceEpsilonSq = distanceEpsilon * distanceEpsilon;
-        areaEpsilon = distanceEpsilon * scale;
-        sideEpsilon = areaEpsilon;
+        sign = area < (Real)0.0 ? -(Real)1.0 : (Real)1.0;
+        return true;
     }
 
-    private static void CompactPolygon(Span<ClipPoint> polygon, ref int count,
-        Real distanceEpsilonSq, Real areaEpsilon)
+    // Standard convex point-in-polygon test, evaluated directly in 3D via the contact normal.
+    private static bool ContainsPoint(ReadOnlySpan<JVector> polygon, int count, in JVector point,
+        in JVector normal, Real sign)
     {
-        if (count == 0) return;
+        const Real epsilon = (Real)1e-3;
 
-        int write = 0;
+        JVector previous = polygon[count - 1];
 
         for (int i = 0; i < count; i++)
         {
-            ClipPoint current = polygon[i];
+            JVector current = polygon[i];
+            Real side = sign * JVector.Dot((current - previous) % (point - previous), normal);
 
-            if (write > 0 && (polygon[write - 1] - current).LengthSquared() <= distanceEpsilonSq)
-            {
-                continue;
-            }
+            if (side < -epsilon) return false;
 
-            polygon[write++] = current;
+            previous = current;
         }
 
-        if (write > 1 && (polygon[0] - polygon[write - 1]).LengthSquared() <= distanceEpsilonSq)
-        {
-            write -= 1;
-        }
-
-        count = write;
-        if (count < 3) return;
-
-        bool removed;
-
-        do
-        {
-            removed = false;
-
-            for (int i = 0; i < count; i++)
-            {
-                ClipPoint previous = polygon[(i + count - 1) % count];
-                ClipPoint current = polygon[i];
-                ClipPoint next = polygon[(i + 1) % count];
-
-                ClipPoint edge0 = current - previous;
-                ClipPoint edge1 = next - current;
-
-                if (MathR.Abs(Cross2D(edge0, edge1)) > areaEpsilon) continue;
-
-                for (int j = i; j < count - 1; j++)
-                {
-                    polygon[j] = polygon[j + 1];
-                }
-
-                count -= 1;
-                removed = true;
-                break;
-            }
-        }
-        while (removed && count >= 3);
+        return true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Real SideOfEdge(in ClipPoint edgeStart, in ClipPoint edgeEnd, in ClipPoint point)
+    // Clip a segment against the half-spaces of a convex polygon.
+    // This is the polygon/segment fallback when one sampled feature collapses to a line.
+    private static int ClipSegmentAgainstPolygon(in JVector start, in JVector end,
+        ReadOnlySpan<JVector> polygon, int polygonCount, in JVector normal, Real sign, Span<JVector> clipped)
     {
-        return Cross2D(edgeEnd - edgeStart, point - edgeStart);
-    }
+        const Real epsilon = (Real)1e-3;
 
-    private static ClipPoint IntersectSegmentsAgainstEdge(in ClipPoint edgeStart, in ClipPoint edgeEnd,
-        in ClipPoint start, in ClipPoint end, Real startSide, Real endSide, Real distanceEpsilonSq)
-    {
-        Real denominator = startSide - endSide;
-
-        if (MathR.Abs(denominator) <= distanceEpsilonSq)
-        {
-            return MathR.Abs(startSide) <= MathR.Abs(endSide) ? start : end;
-        }
-
-        Real t = startSide / denominator;
-        t = Math.Clamp(t, (Real)0.0, (Real)1.0);
-
-        return start + t * (end - start);
-    }
-
-    private static int ClipConvexPolygon(Span<ClipPoint> subject, int subjectCount,
-        ReadOnlySpan<ClipPoint> clip, int clipCount, Span<ClipPoint> buffer,
-        Real sideEpsilon, Real distanceEpsilonSq, Real areaEpsilon)
-    {
-        Span<ClipPoint> input = subject;
-        Span<ClipPoint> output = buffer;
-        int inputCount = subjectCount;
-        bool resultInSubject = true;
-
-        for (int edge = 0; edge < clipCount; edge++)
-        {
-            if (inputCount == 0) return 0;
-
-            ClipPoint edgeStart = clip[edge];
-            ClipPoint edgeEnd = clip[(edge + 1) % clipCount];
-            int outputCount = 0;
-
-            ClipPoint start = input[inputCount - 1];
-            Real startSide = SideOfEdge(edgeStart, edgeEnd, start);
-            bool startInside = startSide >= -sideEpsilon;
-
-            for (int i = 0; i < inputCount; i++)
-            {
-                ClipPoint end = input[i];
-                Real endSide = SideOfEdge(edgeStart, edgeEnd, end);
-                bool endInside = endSide >= -sideEpsilon;
-
-                if (startInside != endInside)
-                {
-                    output[outputCount++] = IntersectSegmentsAgainstEdge(
-                        edgeStart, edgeEnd, start, end, startSide, endSide, distanceEpsilonSq);
-                }
-
-                if (endInside)
-                {
-                    output[outputCount++] = end;
-                }
-
-                start = end;
-                startSide = endSide;
-                startInside = endInside;
-            }
-
-            CompactPolygon(output, ref outputCount, distanceEpsilonSq, areaEpsilon);
-
-            Span<ClipPoint> temporary = input;
-            input = output;
-            output = temporary;
-            inputCount = outputCount;
-            resultInSubject = !resultInSubject;
-        }
-
-        if (!resultInSubject)
-        {
-            input[..inputCount].CopyTo(subject);
-        }
-
-        return inputCount;
-    }
-
-    // When the projected overlap degenerates from a 2D polygon to a 1D feature, the polygon clipper
-    // above returns nothing. These helpers recover the line overlap and emit one or two endpoints.
-    private static bool ClipSegmentAgainstPolygon(in ClipPoint segmentStart, in ClipPoint segmentEnd,
-        ReadOnlySpan<ClipPoint> polygon, int polygonCount,
-        Real sideEpsilon, Real distanceEpsilonSq, Span<ClipPoint> clipped, out int clippedCount)
-    {
         Real enter = (Real)0.0;
         Real exit = (Real)1.0;
-        ClipPoint delta = segmentEnd - segmentStart;
+        JVector delta = end - start;
 
-        for (int edge = 0; edge < polygonCount; edge++)
+        for (int i = 0; i < polygonCount; i++)
         {
-            ClipPoint edgeStart = polygon[edge];
-            ClipPoint edgeEnd = polygon[(edge + 1) % polygonCount];
+            JVector edgeStart = polygon[i];
+            JVector edgeEnd = polygon[(i + 1) % polygonCount];
 
-            Real startSide = SideOfEdge(edgeStart, edgeEnd, segmentStart) + sideEpsilon;
-            Real endSide = SideOfEdge(edgeStart, edgeEnd, segmentEnd) + sideEpsilon;
+            Real startSide = sign * JVector.Dot((edgeEnd - edgeStart) % (start - edgeStart), normal);
+            Real endSide = sign * JVector.Dot((edgeEnd - edgeStart) % (end - edgeStart), normal);
 
-            bool startInside = startSide >= (Real)0.0;
-            bool endInside = endSide >= (Real)0.0;
+            bool startInside = startSide >= -epsilon;
+            bool endInside = endSide >= -epsilon;
 
-            if (!startInside && !endInside)
-            {
-                clippedCount = 0;
-                return false;
-            }
-
+            if (!startInside && !endInside) return 0;
             if (startInside && endInside) continue;
 
             Real denominator = startSide - endSide;
+            if (MathR.Abs(denominator) <= epsilon) return 0;
 
-            if (MathR.Abs(denominator) <= distanceEpsilonSq)
-            {
-                clippedCount = 0;
-                return false;
-            }
-
-            Real t = startSide / denominator;
-            t = Math.Clamp(t, (Real)0.0, (Real)1.0);
+            Real t = Math.Clamp(startSide / denominator, (Real)0.0, (Real)1.0);
 
             if (!startInside)
             {
@@ -392,141 +178,200 @@ public unsafe struct CollisionManifold
                 exit = MathR.Min(exit, t);
             }
 
-            if (exit < enter)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            if (exit < enter) return 0;
         }
 
-        StoreLinearIntersection(segmentStart + enter * delta, segmentStart + exit * delta,
-            distanceEpsilonSq, clipped, out clippedCount);
+        clipped[0] = start + enter * delta;
 
-        return true;
+        if ((start + exit * delta - clipped[0]).LengthSquared() < epsilon)
+        {
+            return 1;
+        }
+
+        clipped[1] = start + exit * delta;
+        return 2;
     }
 
-    private static bool IntersectSegments(in ClipPoint leftStart, in ClipPoint leftEnd,
-        in ClipPoint rightStart, in ClipPoint rightEnd,
-        Real sideEpsilon, Real distanceEpsilonSq, Real areaEpsilon,
-        Span<ClipPoint> clipped, out int clippedCount)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    // Signed scalar 2D cross product after projecting along the contact normal.
+    private static Real CrossAlongNormal(in JVector left, in JVector right, in JVector normal)
     {
-        ClipPoint leftDelta = leftEnd - leftStart;
-        ClipPoint rightDelta = rightEnd - rightStart;
-        ClipPoint offset = rightStart - leftStart;
+        return JVector.Dot(left % right, normal);
+    }
 
-        Real cross = Cross2D(leftDelta, rightDelta);
-        const Real parameterEpsilon = (Real)1e-5;
+    // Intersect two segments in the contact plane.
+    // Handles both the normal crossing case and parallel collinear overlap.
+    private static int IntersectSegments(in JVector startA, in JVector endA,
+        in JVector startB, in JVector endB, in JVector normal,
+        Span<JVector> clippedA, Span<JVector> clippedB)
+    {
+        const Real epsilon = (Real)1e-3;
 
-        if (MathR.Abs(cross) <= areaEpsilon)
+        JVector deltaA = endA - startA;
+        JVector deltaB = endB - startB;
+        JVector offset = startB - startA;
+
+        Real cross = CrossAlongNormal(deltaA, deltaB, normal);
+
+        if (MathR.Abs(cross) <= epsilon)
         {
-            if (MathR.Abs(Cross2D(offset, leftDelta)) > areaEpsilon)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            if (MathR.Abs(CrossAlongNormal(offset, deltaA, normal)) > epsilon) return 0;
 
-            bool useLeft = leftDelta.LengthSquared() >= rightDelta.LengthSquared();
-            ClipPoint baseStart = useLeft ? leftStart : rightStart;
-            ClipPoint baseDelta = useLeft ? leftDelta : rightDelta;
+            Real lengthASquared = deltaA.LengthSquared();
+            Real lengthBSquared = deltaB.LengthSquared();
 
-            bool useXAxis = MathR.Abs(baseDelta.X) >= MathR.Abs(baseDelta.Y);
-            Real baseOrigin = useXAxis ? baseStart.X : baseStart.Y;
-            Real baseExtent = useXAxis ? baseDelta.X : baseDelta.Y;
+            if (lengthASquared <= epsilon || lengthBSquared <= epsilon) return 0;
 
-            if (MathR.Abs(baseExtent) <= sideEpsilon)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            Real parameterB0 = JVector.Dot(startB - startA, deltaA) / lengthASquared;
+            Real parameterB1 = JVector.Dot(endB - startA, deltaA) / lengthASquared;
 
-            Real leftMin = MathR.Min(useXAxis ? leftStart.X : leftStart.Y, useXAxis ? leftEnd.X : leftEnd.Y);
-            Real leftMax = MathR.Max(useXAxis ? leftStart.X : leftStart.Y, useXAxis ? leftEnd.X : leftEnd.Y);
-            Real rightMin = MathR.Min(useXAxis ? rightStart.X : rightStart.Y, useXAxis ? rightEnd.X : rightEnd.Y);
-            Real rightMax = MathR.Max(useXAxis ? rightStart.X : rightStart.Y, useXAxis ? rightEnd.X : rightEnd.Y);
+            Real enter = MathR.Max((Real)0.0, MathR.Min(parameterB0, parameterB1));
+            Real exit = MathR.Min((Real)1.0, MathR.Max(parameterB0, parameterB1));
 
-            Real overlapMin = MathR.Max(leftMin, rightMin);
-            Real overlapMax = MathR.Min(leftMax, rightMax);
+            if (exit < enter - epsilon) return 0;
 
-            if (overlapMax + sideEpsilon < overlapMin)
-            {
-                clippedCount = 0;
-                return false;
-            }
+            clippedA[0] = startA + enter * deltaA;
 
-            Real t0 = (overlapMin - baseOrigin) / baseExtent;
-            Real t1 = (overlapMax - baseOrigin) / baseExtent;
+            Real parameterA0 = Math.Clamp(JVector.Dot(clippedA[0] - startB, deltaB) / lengthBSquared, (Real)0.0, (Real)1.0);
+            clippedB[0] = startB + parameterA0 * deltaB;
 
-            StoreLinearIntersection(baseStart + t0 * baseDelta, baseStart + t1 * baseDelta,
-                distanceEpsilonSq, clipped, out clippedCount);
+            clippedA[1] = startA + exit * deltaA;
 
-            return true;
+            if ((clippedA[1] - clippedA[0]).LengthSquared() <= epsilon) return 1;
+
+            Real parameterA1 = Math.Clamp(JVector.Dot(clippedA[1] - startB, deltaB) / lengthBSquared, (Real)0.0, (Real)1.0);
+            clippedB[1] = startB + parameterA1 * deltaB;
+
+            return 2;
         }
 
-        Real t = Cross2D(offset, rightDelta) / cross;
-        Real u = Cross2D(offset, leftDelta) / cross;
+        Real t = CrossAlongNormal(offset, deltaB, normal) / cross;
+        Real u = CrossAlongNormal(offset, deltaA, normal) / cross;
 
-        if (t < -parameterEpsilon || t > (Real)1.0 + parameterEpsilon ||
-            u < -parameterEpsilon || u > (Real)1.0 + parameterEpsilon)
+        if (t < -epsilon || t > (Real)1.0 + epsilon ||
+            u < -epsilon || u > (Real)1.0 + epsilon)
         {
-            clippedCount = 0;
-            return false;
+            return 0;
         }
 
         t = Math.Clamp(t, (Real)0.0, (Real)1.0);
-        clipped[0] = leftStart + t * leftDelta;
-        clippedCount = 1;
+        u = Math.Clamp(u, (Real)0.0, (Real)1.0);
 
-        return true;
+        clippedA[0] = startA + t * deltaA;
+        clippedB[0] = startB + u * deltaB;
+
+        return 1;
     }
 
-    private static bool TryClipLinearIntersection(ReadOnlySpan<ClipPoint> left, int leftCount,
-        ReadOnlySpan<ClipPoint> right, int rightCount,
-        Real sideEpsilon, Real distanceEpsilonSq, Real areaEpsilon,
-        Span<ClipPoint> clipped, out int clippedCount)
+    // Avoid inserting the same contact multiple times from overlapping collection paths.
+    private static bool IsDuplicatePoint(ReadOnlySpan<JVector> manifold, int count, in JVector point)
     {
-        if (leftCount < 2 || rightCount < 2)
+        for (int i = 0; i < count; i++)
         {
-            clippedCount = 0;
-            return false;
+            if ((manifold[i] - point).LengthSquared() < DuplicatePointDistanceSq) return true;
         }
 
-        if (leftCount == 2 && rightCount == 2)
-        {
-            return IntersectSegments(left[0], left[1], right[0], right[1],
-                sideEpsilon, distanceEpsilonSq, areaEpsilon, clipped, out clippedCount);
-        }
-
-        if (leftCount == 2)
-        {
-            return ClipSegmentAgainstPolygon(left[0], left[1], right, rightCount,
-                sideEpsilon, distanceEpsilonSq, clipped, out clippedCount);
-        }
-
-        if (rightCount == 2)
-        {
-            return ClipSegmentAgainstPolygon(right[0], right[1], left, leftCount,
-                sideEpsilon, distanceEpsilonSq, clipped, out clippedCount);
-        }
-
-        clippedCount = 0;
         return false;
     }
 
-    private static int SelectEvenlySpacedIndices(int count, int targetCount, Span<int> selected)
+    // Register a contact whose geometric anchor came from shape A.
+    // The matching point on B is reconstructed by sliding along the collision normal.
+    private static void AddPointOnA(Span<JVector> manifoldA, Span<JVector> manifoldB, ref int manifoldCount,
+        in JVector point, in JVector pB, in JVector normal)
     {
-        if (selected.Length < targetCount)
+        if (manifoldCount == MaxManifoldPoints) return;
+
+        Real diff = JVector.Dot(point - pB, normal);
+        if (diff < (Real)0.0) return;
+        if (IsDuplicatePoint(manifoldA, manifoldCount, point)) return;
+
+        manifoldA[manifoldCount] = point;
+        manifoldB[manifoldCount++] = point - diff * normal;
+    }
+
+    // Register a contact whose geometric anchor came from shape B.
+    private static void AddPointOnB(Span<JVector> manifoldA, Span<JVector> manifoldB, ref int manifoldCount,
+        in JVector point, in JVector pA, in JVector normal)
+    {
+        if (manifoldCount == MaxManifoldPoints) return;
+
+        Real diff = JVector.Dot(point - pA, normal);
+        if (diff > (Real)0.0) return;
+        if (IsDuplicatePoint(manifoldB, manifoldCount, point)) return;
+
+        manifoldB[manifoldCount] = point;
+        manifoldA[manifoldCount++] = point - diff * normal;
+    }
+
+    // Register a contact where both sides came from an explicit intersection computation.
+    private static void AddPointPair(Span<JVector> manifoldA, Span<JVector> manifoldB, ref int manifoldCount,
+        in JVector pointA, in JVector pointB, in JVector normal)
+    {
+        if (manifoldCount == MaxManifoldPoints) return;
+        if (JVector.Dot(pointA - pointB, normal) < (Real)0.0) return;
+        if (IsDuplicatePoint(manifoldA, manifoldCount, pointA)) return;
+        if (IsDuplicatePoint(manifoldB, manifoldCount, pointB)) return;
+
+        manifoldA[manifoldCount] = pointA;
+        manifoldB[manifoldCount++] = pointB;
+    }
+
+    // The solver only wants four contacts. We sort the points around the centroid and
+    // keep four evenly distributed samples so the retained set covers the contact patch.
+    private static void ReduceManifold(Span<JVector> manifoldA, Span<JVector> manifoldB, ref int manifoldCount, in JVector normal)
+    {
+        if (manifoldCount <= SolverContactLimit) return;
+
+        JVector centroid = JVector.Zero;
+
+        for (int i = 0; i < manifoldCount; i++)
         {
-            throw new ArgumentException($"Selected span must hold at least {targetCount} indices.", nameof(selected));
+            centroid += manifoldA[i];
         }
 
-        int selectedCount = Math.Min(count, targetCount);
+        centroid *= (Real)(1.0 / manifoldCount);
 
-        for (int i = 0; i < selectedCount; i++)
+        JVector tangent1 = MathHelper.CreateOrthonormal(normal);
+        JVector tangent2 = normal % tangent1;
+
+        Span<double> angles = stackalloc double[MaxManifoldPoints];
+        Span<int> order = stackalloc int[MaxManifoldPoints];
+
+        for (int i = 0; i < manifoldCount; i++)
         {
-            selected[i] = ((2 * i + 1) * count) / (2 * selectedCount);
+            JVector delta = manifoldA[i] - centroid;
+            angles[i] = StableMath.Atan2(JVector.Dot(delta, tangent2), JVector.Dot(delta, tangent1));
+            order[i] = i;
         }
 
-        return selectedCount;
+        for (int i = 1; i < manifoldCount; i++)
+        {
+            int current = order[i];
+            double currentAngle = angles[current];
+            int j = i - 1;
+
+            while (j >= 0 && angles[order[j]] > currentAngle)
+            {
+                order[j + 1] = order[j];
+                j--;
+            }
+
+            order[j + 1] = current;
+        }
+
+        Span<JVector> reducedA = stackalloc JVector[SolverContactLimit];
+        Span<JVector> reducedB = stackalloc JVector[SolverContactLimit];
+
+        for (int i = 0; i < SolverContactLimit; i++)
+        {
+            int selected = order[((2 * i + 1) * manifoldCount) / (2 * SolverContactLimit)];
+            reducedA[i] = manifoldA[selected];
+            reducedB[i] = manifoldB[selected];
+        }
+
+        reducedA.CopyTo(manifoldA);
+        reducedB.CopyTo(manifoldB);
+        manifoldCount = SolverContactLimit;
     }
 
     /// <summary>
@@ -543,6 +388,7 @@ public unsafe struct CollisionManifold
     /// <param name="pA">Initial contact point on shape A.</param>
     /// <param name="pB">Initial contact point on shape B.</param>
     /// <param name="normal">The collision normal (from B to A).</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     [SkipLocalsInit]
     public void BuildManifold<Ta,Tb>(Ta shapeA, Tb shapeB, in JQuaternion quaternionA, in JQuaternion quaternionB,
         in JVector positionA, in JVector positionB, in JVector pA, in JVector pB, in JVector normal)
@@ -553,18 +399,22 @@ public unsafe struct CollisionManifold
         rightCount = 0;
         manifoldCount = 0;
 
+        // Build a local tangent frame around the collision normal.
         JVector crossVector1 = MathHelper.CreateOrthonormal(normal);
         JVector crossVector2 = normal % crossVector1;
 
-        // Project clipping into a frame translated by -positionA: keeps support points near the
-        // origin and avoids inflating intermediates by |positionA| for bodies far from world origin.
+        // Operate in a frame translated by -positionA so intermediates stay near the origin.
+        // Absolute epsilons in the clipping helpers are scaled to shape size, not world offset.
         JVector relPosB = positionB - positionA;
         JVector pAloc = pA - positionA;
+        JVector pBloc = pB - positionA;
 
-        Span<JVector> left = stackalloc JVector[MaxManifoldPoints];
-        Span<JVector> right = stackalloc JVector[MaxManifoldPoints];
+        Span<JVector> left = stackalloc JVector[MaxSupportPoints];
+        Span<JVector> right = stackalloc JVector[MaxSupportPoints];
 
-        for (int e = 0; e < MaxManifoldPoints; e++)
+        // Sample support points for both shapes around the normal in a hexagonal pattern.
+        // This approximates the active contact feature without a full clipping pipeline.
+        for (int e = 0; e < MaxSupportPoints; e++)
         {
             JVector ptNormal = normal + hexagonVertices[2 * e + 0] * Perturbation * crossVector1 +
                                hexagonVertices[2 * e + 1] * Perturbation * crossVector2;
@@ -584,81 +434,127 @@ public unsafe struct CollisionManifold
         }
 
         Span<JVector> mA = MemoryMarshal.CreateSpan(ref Unsafe.As<Real, JVector>(ref manifoldData[0]), MaxManifoldPoints);
-        Span<JVector> mB = MemoryMarshal.CreateSpan(ref Unsafe.As<Real, JVector>(ref manifoldData[18]), MaxManifoldPoints);
+        Span<JVector> mB = MemoryMarshal.CreateSpan(ref Unsafe.As<Real, JVector>(ref manifoldData[MaxManifoldPoints * 3]), MaxManifoldPoints);
 
-        if (leftCount > 1 && rightCount > 1)
+        // If a sampled loop has non-zero signed area, treat it as a polygon; otherwise it is
+        // effectively a line or point and handled by the dedicated fallback cases below.
+        Real leftSign = (Real)0.0;
+        Real rightSign = (Real)0.0;
+        bool leftPolygon = leftCount > 2 && TryGetPolygonSign(left, leftCount, normal, out leftSign);
+        bool rightPolygon = rightCount > 2 && TryGetPolygonSign(right, rightCount, normal, out rightSign);
+
+        // Polygon/point and polygon/segment cases with shape A contributing the polygon.
+        if (leftPolygon)
         {
-            Span<ClipPoint> left2 = stackalloc ClipPoint[MaxManifoldPoints];
-            Span<ClipPoint> right2 = stackalloc ClipPoint[MaxManifoldPoints];
-
-            for (int i = 0; i < leftCount; i++)
+            for (int e = 0; e < rightCount; e++)
             {
-                left2[i] = ProjectToPlane(left[i], pAloc, crossVector1, crossVector2);
+                JVector p = right[e];
+                if (!ContainsPoint(left, leftCount, p, normal, leftSign)) continue;
+
+                AddPointOnB(mA, mB, ref manifoldCount, p, pAloc, normal);
+                if (manifoldCount == MaxManifoldPoints) goto Finalize;
             }
 
-            for (int i = 0; i < rightCount; i++)
+            if (rightCount == 2)
             {
-                right2[i] = ProjectToPlane(right[i], pAloc, crossVector1, crossVector2);
-            }
+                Span<JVector> clipped = stackalloc JVector[2];
+                int clippedCount = ClipSegmentAgainstPolygon(right[0], right[1], left, leftCount, normal, leftSign, clipped);
 
-            CalculateClipTolerance(left2, leftCount, right2, rightCount,
-                out Real sideEpsilon, out Real distanceEpsilonSq, out Real areaEpsilon);
-
-            CompactPolygon(left2, ref leftCount, distanceEpsilonSq, areaEpsilon);
-            CompactPolygon(right2, ref rightCount, distanceEpsilonSq, areaEpsilon);
-
-            if (leftCount > 2) NormalizeWinding(left2, leftCount);
-            if (rightCount > 2) NormalizeWinding(right2, rightCount);
-
-            Span<ClipPoint> clipped = stackalloc ClipPoint[MaxClipPoints];
-
-            int clippedCount = 0;
-
-            if (leftCount > 2 && rightCount > 2)
-            {
-                Span<ClipPoint> buffer = stackalloc ClipPoint[MaxClipPoints];
-
-                left2[..leftCount].CopyTo(clipped);
-
-                clippedCount = ClipConvexPolygon(clipped, leftCount, right2[..rightCount], rightCount, buffer,
-                    sideEpsilon, distanceEpsilonSq, areaEpsilon);
-            }
-
-            if (clippedCount == 0)
-            {
-                TryClipLinearIntersection(left2[..leftCount], leftCount, right2[..rightCount], rightCount,
-                    sideEpsilon, distanceEpsilonSq, areaEpsilon, clipped, out clippedCount);
-            }
-
-            Real depth = JVector.Dot(pB - pA, normal);
-            JVector depthNormal = depth * normal;
-
-            CompactPolygon(clipped, ref clippedCount, distanceEpsilonSq, areaEpsilon);
-
-            if (clippedCount > 0)
-            {
-                Span<int> selected = stackalloc int[SolverContactLimit];
-                int selectedCount = SelectEvenlySpacedIndices(clippedCount, SolverContactLimit, selected);
-
-                for (int i = 0; i < selectedCount; i++)
+                for (int i = 0; i < clippedCount; i++)
                 {
-                    JVector pointOnA = LiftFromPlane(clipped[selected[i]], pA, crossVector1, crossVector2);
-                    mA[manifoldCount] = pointOnA;
-                    mB[manifoldCount++] = pointOnA + depthNormal;
+                    AddPointOnB(mA, mB, ref manifoldCount, clipped[i], pAloc, normal);
+                    if (manifoldCount == MaxManifoldPoints) goto Finalize;
                 }
             }
         }
 
+        // Same logic with the roles reversed so we also pick anchors contributed by shape A.
+        if (rightPolygon)
+        {
+            for (int e = 0; e < leftCount; e++)
+            {
+                JVector p = left[e];
+                if (!ContainsPoint(right, rightCount, p, normal, rightSign)) continue;
+
+                AddPointOnA(mA, mB, ref manifoldCount, p, pBloc, normal);
+                if (manifoldCount == MaxManifoldPoints) goto Finalize;
+            }
+
+            if (leftCount == 2)
+            {
+                Span<JVector> clipped = stackalloc JVector[2];
+                int clippedCount = ClipSegmentAgainstPolygon(left[0], left[1], right, rightCount, normal, rightSign, clipped);
+
+                for (int i = 0; i < clippedCount; i++)
+                {
+                    AddPointOnA(mA, mB, ref manifoldCount, clipped[i], pBloc, normal);
+                    if (manifoldCount == MaxManifoldPoints) goto Finalize;
+                }
+            }
+        }
+
+        // Pure segment/segment manifold. This is needed because neither side produced a polygon.
+        if (leftCount == 2 && rightCount == 2)
+        {
+            Span<JVector> clippedA = stackalloc JVector[2];
+            Span<JVector> clippedB = stackalloc JVector[2];
+            int clippedCount = IntersectSegments(left[0], left[1], right[0], right[1], normal, clippedA, clippedB);
+
+            for (int i = 0; i < clippedCount; i++)
+            {
+                AddPointPair(mA, mB, ref manifoldCount, clippedA[i], clippedB[i], normal);
+                if (manifoldCount == MaxManifoldPoints) goto Finalize;
+            }
+        }
+
+        // Polygon/polygon case: in addition to inside vertices, also collect explicit edge intersections.
+        if (leftPolygon && rightPolygon)
+        {
+            Span<JVector> clippedA = stackalloc JVector[2];
+            Span<JVector> clippedB = stackalloc JVector[2];
+
+            for (int i = 0; i < leftCount; i++)
+            {
+                JVector startA = left[i];
+                JVector endA = left[(i + 1) % leftCount];
+
+                for (int j = 0; j < rightCount; j++)
+                {
+                    JVector startB = right[j];
+                    JVector endB = right[(j + 1) % rightCount];
+
+                    int clippedCount = IntersectSegments(startA, endA, startB, endB, normal, clippedA, clippedB);
+
+                    for (int k = 0; k < clippedCount; k++)
+                    {
+                        AddPointPair(mA, mB, ref manifoldCount, clippedA[k], clippedB[k], normal);
+                        if (manifoldCount == MaxManifoldPoints) goto Finalize;
+                    }
+                }            
+            }
+        }
+
+        // If none of the feature logic produced anything, fall back to the original deepest pair.
         if (manifoldCount == 0)
         {
-            mA[manifoldCount] = pA;
-            mB[manifoldCount++] = pB;
+            mA[manifoldCount] = pAloc;
+            mB[manifoldCount++] = pBloc;
+        }
+
+        Finalize:
+        // Final reduction from raw manifold candidates to the solver-facing contact set.
+        ReduceManifold(mA, mB, ref manifoldCount, normal);
+
+        // Lift the surviving contacts back into world space.
+        for (int i = 0; i < manifoldCount; i++)
+        {
+            mA[i] += positionA;
+            mB[i] += positionA;
         }
     } // BuildManifold
 
     /// <summary>
-    /// Builds the contact manifold between two rigid body shapes, reading position and orientation
-    /// directly from their attached rigid bodies.
+    /// Builds the contact manifold between two rigid body shapes using their current transforms.
     /// </summary>
     /// <typeparam name="Ta">The type of shape A.</typeparam>
     /// <typeparam name="Tb">The type of shape B.</typeparam>
@@ -668,6 +564,7 @@ public unsafe struct CollisionManifold
     /// <param name="pB">Initial contact point on shape B.</param>
     /// <param name="normal">The collision normal (from B to A).</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SkipLocalsInit]
     public void BuildManifold<Ta,Tb>(Ta shapeA, Tb shapeB,
         in JVector pA, in JVector pB, in JVector normal) where Ta : RigidBodyShape where Tb : RigidBodyShape
     {
