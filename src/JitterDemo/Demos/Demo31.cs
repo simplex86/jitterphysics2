@@ -261,26 +261,13 @@ public sealed class Demo31 : IDemo, IDrawUpdate, ICleanDemo
                 float px = (x - (columns - 1) * 0.5f) * blockSize.X + rowOffset;
                 float py = blockSize.Y * 0.5f + y * blockSize.Y;
 
-                RigidBody body = world.CreateRigidBody();
-                body.Position = origin + new JVector(px, py, 0);
-                body.Friction = 0.55f;
-                body.Restitution = 0.04f;
-                body.AddShape(new BoxShape(blockSize.X, blockSize.Y, blockSize.Z));
-                body.Tag = new BreakableBodyTag();
-
-                Breakable breakable = new()
-                {
-                    Body = body,
-                    Size = blockSize,
-                    BoundsMin = blockSize * -0.5f,
-                    BoundsMax = blockSize * 0.5f,
-                    Radius = blockSize.Length() * 0.5f,
-                    Seed = seed++,
-                    Source = CreateBoxPolyhedron(blockSize)
-                };
-
-                body.BeginCollide += OnBreakableCollide;
-                breakables.Add(body, breakable);
+                RegisterBreakableBox(
+                    origin + new JVector(px, py, 0.0f),
+                    blockSize,
+                    seed++,
+                    friction: 0.55f,
+                    restitution: 0.04f,
+                    orientation: JQuaternion.Identity);
             }
         }
     }
@@ -288,23 +275,35 @@ public sealed class Demo31 : IDemo, IDrawUpdate, ICleanDemo
     private void BuildBreakablePane(JVector origin, int seed)
     {
         JVector paneSize = new(4.4f, 2.6f, 0.24f);
+        RegisterBreakableBox(
+            origin + new JVector(0.0f, 7.5f, 0.0f),
+            paneSize,
+            seed,
+            friction: 0.75f,
+            restitution: 0.03f,
+            orientation: JQuaternion.CreateRotationZ(0.18f) * JQuaternion.CreateRotationX(0.08f));
+    }
+
+    private void RegisterBreakableBox(
+        JVector position, JVector size, int seed, float friction, float restitution, JQuaternion orientation)
+    {
         RigidBody body = world.CreateRigidBody();
-        body.Position = origin + new JVector(0.0f, 7.5f, 0.0f);
-        body.Orientation = JQuaternion.CreateRotationZ(0.18f) * JQuaternion.CreateRotationX(0.08f);
-        body.Friction = 0.75f;
-        body.Restitution = 0.03f;
-        body.AddShape(new BoxShape(paneSize.X, paneSize.Y, paneSize.Z));
+        body.Position = position;
+        body.Orientation = orientation;
+        body.Friction = friction;
+        body.Restitution = restitution;
+        body.AddShape(new BoxShape(size.X, size.Y, size.Z));
         body.Tag = new BreakableBodyTag();
 
         Breakable breakable = new()
         {
             Body = body,
-            Size = paneSize,
-            BoundsMin = paneSize * -0.5f,
-            BoundsMax = paneSize * 0.5f,
-            Radius = paneSize.Length() * 0.5f,
+            Size = size,
+            BoundsMin = size * -0.5f,
+            BoundsMax = size * 0.5f,
+            Radius = size.Length() * 0.5f,
             Seed = seed,
-            Source = CreateBoxPolyhedron(paneSize)
+            Source = CreateBoxPolyhedron(size)
         };
 
         body.BeginCollide += OnBreakableCollide;
@@ -338,22 +337,26 @@ public sealed class Demo31 : IDemo, IDrawUpdate, ICleanDemo
 
     private void OnBreakableCollide(Arbiter arbiter)
     {
-        RigidBody? body = null;
-        RigidBody? other = null;
+        RigidBody body;
+        RigidBody other;
+        Breakable? breakable;
 
-        if (breakables.ContainsKey(arbiter.Body1))
+        if (breakables.TryGetValue(arbiter.Body1, out breakable))
         {
             body = arbiter.Body1;
             other = arbiter.Body2;
         }
-        else if (breakables.ContainsKey(arbiter.Body2))
+        else if (breakables.TryGetValue(arbiter.Body2, out breakable))
         {
             body = arbiter.Body2;
             other = arbiter.Body1;
         }
+        else
+        {
+            return;
+        }
 
-        if (body == null || other == null) return;
-        if (!breakables.TryGetValue(body, out Breakable? breakable)) return;
+        if (breakable == null) return;
         if (breakable.Generation > 0 && breakable.TimeSinceCreated < RefractureArmDelay) return;
 
         JVector relativeVelocity = body.Velocity - other.Velocity;
@@ -374,14 +377,14 @@ public sealed class Demo31 : IDemo, IDrawUpdate, ICleanDemo
         JVector sum = JVector.Zero;
         int count = 0;
 
-        AddContact(ContactData.MaskContact0, data.Contact0);
-        AddContact(ContactData.MaskContact1, data.Contact1);
-        AddContact(ContactData.MaskContact2, data.Contact2);
-        AddContact(ContactData.MaskContact3, data.Contact3);
+        AddContact(ContactData.MaskContact0, in data.Contact0);
+        AddContact(ContactData.MaskContact1, in data.Contact1);
+        AddContact(ContactData.MaskContact2, in data.Contact2);
+        AddContact(ContactData.MaskContact3, in data.Contact3);
 
         return count == 0 ? (arbiter.Body1.Position + arbiter.Body2.Position) * 0.5f : sum * (1.0f / count);
 
-        void AddContact(uint contactMask, ContactData.Contact contact)
+        void AddContact(uint contactMask, in ContactData.Contact contact)
         {
             if ((mask & contactMask) == 0) return;
 
