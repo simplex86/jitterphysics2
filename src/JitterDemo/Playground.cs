@@ -104,6 +104,7 @@ public partial class Playground : RenderWindow
         new Demo28(),
         new Demo29(),
         new Demo30(),
+        new Demo31(),
     };
 
     private IDemo? currentDemo;
@@ -324,10 +325,7 @@ public partial class Playground : RenderWindow
 
         if (!Mouse.IsButtonDown(Mouse.Button.Left))
         {
-            if (grabConstraint != null) world.Remove(grabConstraint);
-            grabBody = null;
-            grabConstraint = null;
-            grabbing = false;
+            ClearGrab();
         }
 
         if (Keyboard.KeyPressBegin(Keyboard.Key.M))
