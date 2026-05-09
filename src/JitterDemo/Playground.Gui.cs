@@ -52,6 +52,63 @@ public partial class Playground : RenderWindow
     private bool timingsSectionOpen = true;
     private bool gcSectionOpen = true;
 
+    private void ConfigureGuiTheme()
+    {
+        Gui.Theme = new Theme
+        {
+            PanelBg = new Color(20, 20, 20, 80),
+            PanelBorder = new Color(156, 156, 156, 72),
+            ButtonBg = new Color(68, 68, 68, 120),
+            ButtonBgHover = new Color(92, 92, 92, 152),
+            ButtonBgPressed = new Color(60, 60, 60, 136),
+            ButtonBorder = new Color(148, 148, 148, 72),
+            ButtonBorderHover = new Color(188, 188, 188, 96),
+            ButtonBorderPressed = new Color(140, 140, 140, 84),
+            ToggleBg = new Color(72, 72, 72, 132),
+            ToggleBgHover = new Color(72, 104, 156, 176),
+            ToggleBgPressed = new Color(60, 90, 140, 188),
+            ToggleBgActive = new Color(88, 78, 58, 176),
+            ToggleBorder = new Color(148, 148, 148, 72),
+            ToggleBorderHover = new Color(154, 184, 224, 124),
+            ToggleBorderPressed = new Color(132, 166, 210, 132),
+            ToggleBorderActive = new Color(255, 200, 90, 216),
+            PlotBg = new Color(54, 84, 132, 108),
+            PlotBorder = new Color(136, 170, 222, 132),
+            PlotFill = new Color(255, 186, 52, 240),
+            SliderBg = new Color(40, 48, 60, 188),
+            SliderBgHover = new Color(48, 58, 72, 204),
+            SliderBgActive = new Color(34, 42, 54, 216),
+            SliderFill = new Color(77, 121, 186, 222),
+            SliderFillActive = new Color(96, 145, 216, 234),
+            SliderBorder = new Color(142, 152, 168, 108),
+            Separator = new Color(196, 196, 196, 112),
+            SelectableBg = Color.Transparent,
+            SelectableBgHover = new Color(72, 118, 188, 76),
+            SelectableBgPressed = new Color(72, 118, 188, 112),
+            SelectableBgSelected = new Color(72, 118, 188, 188),
+            SelectableBorder = Color.Transparent,
+            SelectableBorderHover = Color.Transparent,
+            SelectableBorderPressed = Color.Transparent,
+            SelectableBorderSelected = new Color(128, 170, 226, 136),
+            CollapsingHeaderBg = Color.Transparent,
+            CollapsingHeaderBgHover = new Color(72, 118, 188, 64),
+            CollapsingHeaderBgPressed = new Color(72, 118, 188, 96),
+            CollapsingHeaderBgOpen = Color.Transparent,
+            CollapsingHeaderPadding = new EdgeInsets(2f, 2f),
+            ScrollbarTrack = new Color(80, 80, 80, 150),
+            ScrollbarThumb = new Color(40, 40, 40, 150),
+            ScrollbarThumbHover = new Color(120, 166, 232, 150),
+            ScrollbarThumbActive = new Color(120, 166, 232, 208),
+            WindowTitleText = new Color(255, 200, 90),
+            TextPrimary = Color.White,
+            TextSecondary = new Color(228, 228, 228),
+            TreeIndent = 0f,
+            UseLcdText = true,
+            SliderBlockWidthFactor = 0.2f,
+            SliderFillText = Color.White
+        };
+    }
+
     private void UpdateDisplayText()
     {
         if (Time - lastTime > 1.0d)
