@@ -170,6 +170,36 @@ public sealed partial class World : IDisposable
     public event WorldStep? PostSubStep;
 
     /// <summary>
+    /// Raised when inactive non-static bodies in a simulation island are activated during a simulation step.
+    /// </summary>
+    /// <remarks>
+    /// This event is invoked after the island's non-static bodies, contacts, constraints, and
+    /// shapes have been moved to the active partition. Island instances are internal
+    /// connectivity objects and may later split, merge, or be reused; copy any data you
+    /// need during the callback instead of caching the island reference.
+    /// Do not perform topology-changing world modifications here (for example
+    /// adding or removing bodies, constraints, or contacts, or changing body
+    /// motion types).
+    /// </remarks>
+    [CallbackThread(ThreadContext.MainThread)]
+    public event Action<Island>? IslandActivated;
+
+    /// <summary>
+    /// Raised when active non-static bodies in a simulation island are deactivated during a simulation step.
+    /// </summary>
+    /// <remarks>
+    /// This event is invoked after the island's non-static bodies, contacts, constraints, and
+    /// shapes have been moved to the inactive partition. Island instances are internal
+    /// connectivity objects and may later split, merge, or be reused; copy any data you
+    /// need during the callback instead of caching the island reference.
+    /// Do not perform topology-changing world modifications here (for example
+    /// adding or removing bodies, constraints, or contacts, or changing body
+    /// motion types).
+    /// </remarks>
+    [CallbackThread(ThreadContext.MainThread)]
+    public event Action<Island>? IslandDeactivated;
+
+    /// <summary>
     /// Grants access to objects residing in unmanaged memory. This operation can be potentially unsafe. Use
     /// the corresponding managed properties where possible to mitigate risk.
     /// </summary>
