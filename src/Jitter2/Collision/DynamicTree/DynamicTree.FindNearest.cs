@@ -206,12 +206,13 @@ public partial class DynamicTree
             return false;
         }
 
-        _stack ??= new Stack<int>(256);
-        _stack.Push(root);
+        Stack<int> stack = QueryStack;
+        int baseCount = stack.Count;
+        stack.Push(root);
 
-        while (_stack.Count > 0)
+        while (stack.Count > baseCount)
         {
-            int index = _stack.Pop();
+            int index = stack.Pop();
             ref Node node = ref nodes[index];
 
             if (node.IsLeaf)
@@ -230,7 +231,7 @@ public partial class DynamicTree
                     res.Distance = (Real)0.0;
                     res.Normal = JVector.Zero;
                     if (query.FilterPost != null && !query.FilterPost(res)) continue;
-                    _stack.Clear();
+                    PopTo(stack, baseCount);
                     result = res;
                     return true;
                 }
@@ -255,23 +256,22 @@ public partial class DynamicTree
             {
                 if (leftDist < rightDist)
                 {
-                    _stack.Push(node.Right);
-                    _stack.Push(node.Left);
+                    stack.Push(node.Right);
+                    stack.Push(node.Left);
                 }
                 else
                 {
-                    _stack.Push(node.Left);
-                    _stack.Push(node.Right);
+                    stack.Push(node.Left);
+                    stack.Push(node.Right);
                 }
             }
             else
             {
-                if (leftHit) _stack.Push(node.Left);
-                if (rightHit) _stack.Push(node.Right);
+                if (leftHit) stack.Push(node.Left);
+                if (rightHit) stack.Push(node.Right);
             }
         }
 
-        _stack.Clear();
         return result.Entity != null;
     }
 }
