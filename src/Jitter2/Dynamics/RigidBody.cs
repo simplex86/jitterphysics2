@@ -664,6 +664,16 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         }
     }
 
+    private void ClearQueuedForces()
+    {
+        Force = JVector.Zero;
+        Torque = JVector.Zero;
+
+        ref RigidBodyData data = ref Data;
+        data.DeltaVelocity = JVector.Zero;
+        data.DeltaAngularVelocity = JVector.Zero;
+    }
+
     /// <summary>
     /// Gets or sets how the rigid body participates in the simulation.
     /// </summary>
@@ -672,6 +682,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <list type="bullet">
     /// <item><description>Switching to <see cref="MotionType.Static"/> zeroes velocities, removes connections, and deactivates the body.</description></item>
     /// <item><description>Switching from <see cref="MotionType.Static"/> rebuilds connections from existing contacts.</description></item>
+    /// <item><description>Any queued forces, torques, and force-derived velocity changes are discarded.</description></item>
     /// <item><description>Dynamic bodies use their mass and inertia; static and kinematic bodies are treated as having infinite mass by the solver.</description></item>
     /// </list>
     /// </remarks>
@@ -686,6 +697,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
             switch (value)
             {
                 case MotionType.Static:
+                    ClearQueuedForces();
                     // Switch to static
                     World.RemoveConnections(this);
                     Data.MotionType = MotionType.Static;
@@ -697,6 +709,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
                     break;
                 case MotionType.Kinematic:
                 {
+                    ClearQueuedForces();
                     // Switch to kinematic
                     if (Data.MotionType == MotionType.Static)
                     {
@@ -712,6 +725,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
                 }
                 case MotionType.Dynamic:
                 {
+                    ClearQueuedForces();
                     // Switch to dynamic
                     if (Data.MotionType == MotionType.Static)
                     {
