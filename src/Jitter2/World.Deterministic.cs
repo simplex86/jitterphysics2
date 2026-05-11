@@ -30,8 +30,8 @@ public enum SolveMode
 
     /// <summary>
     /// Island-based deterministic solver. Each simulation island is solved sequentially
-    /// as an independent task. Islands are distributed across threads, so multithreading
-    /// is still used. This mode can be significantly slower than <see cref="Regular"/>.
+    /// as an independent task. Islands are distributed across threads when multithreading
+    /// is enabled. This mode can be significantly slower than <see cref="Regular"/>.
     /// </summary>
     Deterministic
 }
@@ -102,6 +102,9 @@ public sealed partial class World
     private readonly List<ContactEntry> sortedContacts = new();
     private readonly List<SmallConstraintEntry> sortedSmallConstraints = new();
     private readonly List<ConstraintEntry> sortedConstraints = new();
+
+    private int islandSolverIterations;
+    private int islandRelaxationIterations;
 
     // -------------------------------------------------------------------------
     // Build island lookup.
@@ -281,7 +284,7 @@ public sealed partial class World
 
             // --- Iterate ---
 
-            for (int iter = 0; iter < solverIterations; iter++)
+            for (int iter = 0; iter < islandSolverIterations; iter++)
             {
                 for (int i = 0; i < contacts.Length; i++)
                 {
@@ -317,7 +320,7 @@ public sealed partial class World
             IslandRange range = islandRanges[idx];
             var contacts = orderedContacts[range.ContactStart..range.ContactEnd];
 
-            for (int iter = 0; iter < velocityRelaxations; iter++)
+            for (int iter = 0; iter < islandRelaxationIterations; iter++)
             {
                 for (int i = 0; i < contacts.Length; i++)
                 {
@@ -339,10 +342,18 @@ public sealed partial class World
         BuildIslandRanges();
     }
 
-    private void RelaxIslands()
+    private void RelaxIslands(bool multiThread, int iterations)
     {
+        islandRelaxationIterations = iterations;
+
         int numIslands = islandRanges.Count;
         if (numIslands == 0) return;
+
+        if (!multiThread)
+        {
+            RelaxIslandBatch(new Parallel.Batch(0, numIslands));
+            return;
+        }
 
         int numThreads = ThreadPool.Instance.ThreadCount;
         int numTasks = Math.Min(numIslands, numThreads);
@@ -356,10 +367,18 @@ public sealed partial class World
         Parallel.ForBatch(0, numIslands, numTasks, relaxIsland);
     }
 
-    private void SolveIslands(int iterations)
+    private void SolveIslands(bool multiThread, int iterations)
     {
+        islandSolverIterations = iterations;
+
         int numIslands = islandRanges.Count;
         if (numIslands == 0) return;
+
+        if (!multiThread)
+        {
+            SolveIslandBatch(new Parallel.Batch(0, numIslands));
+            return;
+        }
 
         int numThreads = ThreadPool.Instance.ThreadCount;
         int numTasks = Math.Min(numIslands, numThreads);

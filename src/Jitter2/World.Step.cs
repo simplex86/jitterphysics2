@@ -209,9 +209,9 @@ public sealed partial class World
 
             if (SolveMode == Jitter2.SolveMode.Deterministic)
             {
-                SolveIslands(solverIterations);                    // FAST SWEEP
+                SolveIslands(multiThread, solverIterations);       // FAST SWEEP
                 IntegrateVelocities(multiThread);                  // FAST SWEEP
-                RelaxIslands();                                    // FAST SWEEP
+                RelaxIslands(multiThread, velocityRelaxations);    // FAST SWEEP
             }
             else
             {
@@ -320,8 +320,8 @@ public sealed partial class World
 
             for (int i = 0; i < substeps; i++)
             {
-                SolveIslands(solverIterations);
-                RelaxIslands();
+                SolveIslands(multiThread, solverIterations);
+                RelaxIslands(multiThread, relaxationIterations);
             }
         }
         else
