@@ -1119,7 +1119,7 @@ public sealed partial class World
         }
     }
 
-    private readonly Stack<Island> inactivateIslands = new();
+    private readonly Stack<(Island Island, bool RaiseEvent)> inactivateIslands = new();
 
     private void CheckDeactivation()
     {
@@ -1139,6 +1139,9 @@ public sealed partial class World
             island.NeedsUpdate = false;
 
             if (!deactivateIsland && !needsUpdate) continue;
+
+            bool activatedBody = false;
+            bool deactivatedBody = false;
 
             foreach (RigidBody body in island.InternalBodies)
             {
@@ -1162,6 +1165,8 @@ public sealed partial class World
                     // of static bodies, as the island of the static body goes to sleep.
                     if (body.MotionType != MotionType.Static)
                     {
+                        deactivatedBody = true;
+                        
                         foreach (var c in body.InternalContacts)
                         {
                             memContacts.MoveToInactive(c.Handle);
@@ -1191,6 +1196,7 @@ public sealed partial class World
                     if (rigidBody.MotionType == MotionType.Static) continue;
 
                     rigidBody.IsActive = true;
+                    activatedBody = true;
 
                     body.InternalSleepTime = 0;
 
@@ -1221,13 +1227,21 @@ public sealed partial class World
                 }
             }
 
-            if (deactivateIsland) inactivateIslands.Push(island);
+            if (deactivateIsland)
+            {
+                inactivateIslands.Push((island, deactivatedBody));
+            }
+            else if (activatedBody)
+            {
+                IslandActivated?.Invoke(island);
+            }
         }
 
         while (inactivateIslands.Count > 0)
         {
-            Island island = inactivateIslands.Pop();
+            var (island, raiseEvent) = inactivateIslands.Pop();
             islands.MoveToInactive(island);
+            if (raiseEvent) IslandDeactivated?.Invoke(island);
         }
     }
 }

@@ -243,4 +243,74 @@ public class SleepTests
         world.Dispose();
     }
 
+    [TestCase]
+    public void IslandDeactivatedEventIsRaisedAfterIslandSleeps()
+    {
+        var world = new World();
+        world.Gravity = JVector.Zero;
+
+        var body = world.CreateRigidBody();
+        body.AddShape(new BoxShape(1));
+        body.DeactivationTime = TimeSpan.FromSeconds(1);
+
+        int deactivated = 0;
+        bool callbackSawBody = false;
+        bool callbackSawInactiveBody = false;
+        bool callbackSawInactivePartition = false;
+
+        world.IslandDeactivated += island =>
+        {
+            deactivated++;
+            callbackSawBody = island.Bodies.Contains(body);
+            callbackSawInactiveBody = !body.IsActive;
+            callbackSawInactivePartition = !world.Islands.IsActive(island);
+        };
+
+        Helper.AdvanceWorld(world, 2, (Real)(1.0 / 100.0), false);
+
+        Assert.That(deactivated, Is.EqualTo(1));
+        Assert.That(callbackSawBody, Is.True);
+        Assert.That(callbackSawInactiveBody, Is.True);
+        Assert.That(callbackSawInactivePartition, Is.True);
+
+        world.Dispose();
+    }
+
+    [TestCase]
+    public void IslandActivatedEventIsRaisedAfterSleepingIslandWakes()
+    {
+        var world = new World();
+        world.Gravity = JVector.Zero;
+
+        var body = world.CreateRigidBody();
+        body.AddShape(new BoxShape(1));
+        body.DeactivationTime = TimeSpan.FromSeconds(1);
+
+        Helper.AdvanceWorld(world, 2, (Real)(1.0 / 100.0), false);
+        Assert.That(body.IsActive, Is.False);
+
+        int activated = 0;
+        bool callbackSawBody = false;
+        bool callbackSawActiveBody = false;
+        bool callbackSawActivePartition = false;
+
+        world.IslandActivated += island =>
+        {
+            activated++;
+            callbackSawBody = island.Bodies.Contains(body);
+            callbackSawActiveBody = body.IsActive;
+            callbackSawActivePartition = world.Islands.IsActive(island);
+        };
+
+        body.SetActivationState(true);
+        world.Step((Real)(1.0 / 100.0), false);
+
+        Assert.That(activated, Is.EqualTo(1));
+        Assert.That(callbackSawBody, Is.True);
+        Assert.That(callbackSawActiveBody, Is.True);
+        Assert.That(callbackSawActivePartition, Is.True);
+
+        world.Dispose();
+    }
+
 }
