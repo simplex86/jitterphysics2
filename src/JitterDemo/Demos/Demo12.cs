@@ -16,6 +16,11 @@ public class Demo12 : IDemo
         pg.AddFloor();
 
         world.BroadPhaseFilter = new Common.IgnoreCollisionBetweenFilter();
+        
+        // For the ragdoll: joint constraints and speculative contacts compete during
+        // the iterative solve. A slightly higher iteration count makes this fast impact
+        // case more stable.
+        world.SolverIterations = (12, 4);
 
         var wallBody = world.CreateRigidBody();
         wallBody.AddShape(new BoxShape(10, 10f, 0.02f));
