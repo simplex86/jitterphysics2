@@ -3,7 +3,7 @@
 Shapes define how the rigid body collides with other objects.
 Shapes implement the `ISupportMappable` interface and are always convex.
 They can be passed to static methods defined in the `NarrowPhase` class for collision detection.
-Shapes also implement the `IDynamicTreeEntry` interface and can be added to the `DynamicTree` class.
+Shapes also implement the `IDynamicTreeProxy` interface and can be added to the `DynamicTree` class.
 When a shape is added to a rigid body this is done automatically (`world.DynamicTree`).
 
 > [!NOTE]

@@ -57,8 +57,13 @@ public class TeamFilter : IBroadPhaseFilter
     public static TeamMember TeamRed = new();
     public static TeamMember TeamBlue = new();
     
-    public bool Filter(Shape shapeA, Shape shapeB)
+    public bool Filter(IDynamicTreeProxy proxyA, IDynamicTreeProxy proxyB)
     {
+        if (proxyA is not RigidBodyShape shapeA || proxyB is not RigidBodyShape shapeB)
+        {
+            return true;
+        }
+
         if (shapeA.RigidBody.Tag is not TeamMember || shapeB.RigidBody.Tag is not TeamMember)
         {
             // Handle collision normally if at least one body is not a member of any team
@@ -91,7 +96,7 @@ public INarrowPhaseFilter? NarrowPhaseFilter { get; set; }
 
 operates similarly.
 However, this callback is called after narrow phase collision detection, meaning detailed collision information (such as normal, penetration depth, and collision points) is available at this stage.
-The filter can not only exclude collisions but also modify collision information.
+The filter can exclude collisions and also modify collision information.
 
 The default narrow phase collision filter is assigned to an instance of `TriangleEdgeCollisionFilter`, which filters out so-called 'internal edges' for `TriangleShape`s.
 These internal edges typically cause collision artifacts when rigid bodies slide over the edges of connected triangles forming static geometry.

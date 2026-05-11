@@ -176,7 +176,7 @@ public struct RigidBodyData
     }
 
     /// <summary>
-    /// Returns true if the body is static or currently inactive (sleeping).
+    /// Returns true if the body is not dynamic or currently inactive (sleeping).
     /// </summary>
     [Obsolete($"Use {nameof(MotionType)} directly.")]
     public bool IsStaticOrInactive => MotionType != MotionType.Dynamic || !IsActive;
@@ -391,7 +391,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
 
     /// <summary>
     /// Gets or sets the deactivation time. If the magnitudes of both the angular and linear velocity of the rigid body
-    /// remain below the <see cref="DeactivationThreshold"/> for the specified time, the body is deactivated.
+    /// remain below the <see cref="DeactivationThreshold"/> for the specified time, its island can be deactivated.
     /// Default value: 1 second.
     /// </summary>
     public TimeSpan DeactivationTime
@@ -402,7 +402,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
 
     /// <summary>
     /// Gets or sets the deactivation threshold. If the magnitudes of both the angular and linear velocity
-    /// remain below the specified values for the duration of <see cref="DeactivationTime"/>, the body is deactivated.
+    /// remain below the specified values for the duration of <see cref="DeactivationTime"/>, its island can be deactivated.
     /// The threshold values are given in rad/s and length units/s, respectively.
     /// </summary>
     /// <remarks>
@@ -747,6 +747,11 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// Instructs the engine to activate or deactivate the body at the beginning of
     /// the next time step. The current state does not change immediately.
     /// </summary>
+    /// <remarks>
+    /// Activation and deactivation are applied through the body's simulation island.
+    /// Static bodies cannot be activated by this method, although moving a static body can wake connected
+    /// non-static bodies.
+    /// </remarks>
     /// <param name="active">
     /// If <see langword="true"/>, the body will be activated; if <see langword="false"/>, deactivated.
     /// </param>

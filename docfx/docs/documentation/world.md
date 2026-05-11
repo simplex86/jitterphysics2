@@ -23,7 +23,7 @@ Step(float dt, bool multiThread = true)
 > Therefore, it is reasonable to use metric units (kg, m, s) when conceptualizing these values.
 
 The smaller the time step size, the more stable the simulation.
-Timesteps larger than $\mathrm{dt}=1/60\,\mathrm{s}$ are not advised.
+Time steps larger than $\mathrm{dt}=1/60\,\mathrm{s}$ are not advised.
 It is also recommended to use fixed time steps.
 Typical code accumulates delta times and calls `world.Step` only at fixed time intervals, as shown in the following example.
 
@@ -37,12 +37,12 @@ public void FixedTimeStep(float dt, int maxSteps = 4)
     int steps = 0;
     accumulatedTime += dt;
 
-    while (accumulatedTime > fixedStep)
+    while (accumulatedTime >= fixedStep)
     {
-        world.Step(fixedStep, multiThread);
+        world.Step(fixedStep);
         accumulatedTime -= fixedStep;
 
-        // we can not keep up with the real time, i.e. the simulation
+        // we cannot keep up with real time, i.e. the simulation
         // is running slower than the real time is passing.
         if (++steps >= maxSteps) return;
     }
@@ -74,7 +74,7 @@ The latter option is recommended to free processing power for other code, such a
 
 ## Solver Mode
 
-Jitter2 offers two solver strategies through <xref:Jitter2.World.SolveMode>:
+Jitter2 offers two solver strategies through <xref:Jitter2.SolveMode>:
 
 ```cs
 world.SolveMode = SolveMode.Regular;       // default
@@ -109,8 +109,8 @@ The runtime for solving contacts and constraints scales linearly with the number
 ## Substep Count
 
 The time step can be divided into smaller steps, defined by `world.SubstepCount`.
-These smaller time steps are solved similar to regular full steps, however collision information is not updated.
-Each sub step is solved with the number of solver iterations specified in `world.SolverIterations`.
+These smaller time steps are solved similarly to regular full steps; however, collision information is not updated.
+Each substep is solved with the number of solver iterations specified in `world.SolverIterations`.
 For example
 
 ```cs
@@ -118,7 +118,7 @@ world.SubstepCount = 4;
 world.SolverIterations = (solver: 2, relaxation: 1);
 ```
 
-does perform $12$ solver iterations in total for each call to `world.Step`.
+performs $12$ solver iterations in total for each call to `world.Step`.
 The runtime is slower than a single regular step with $12$ iterations but this approach enhances the stability of the simulation.
 Substepping is excellent for enhancing the overall quality of constraints, stabilizing large stacks of objects, and simulating large mass ratios (like heavy objects resting on light objects) with greater accuracy.
 
@@ -206,3 +206,18 @@ It can be used to create constraints that fix a body relative to world space (se
 
 The deactivation system can be globally disabled using `world.AllowDeactivation`.
 Setting this to `false` prevents bodies from being deactivated but does not wake up already sleeping bodies.
+
+Jitter2 deactivates complete simulation islands, not individual bodies in isolation. An island remains
+active while at least one non-static body in it is moving, has been explicitly woken, or is connected
+to newly active contact or constraint data. Once every non-static body in the island remains below
+its deactivation thresholds for long enough, the island is moved to the inactive partition.
+
+Inactive islands have very little runtime cost: their bodies, contacts, constraints, and broad-phase
+proxies are skipped by the active simulation. They can be activated again when user code wakes a body
+or when an active body creates a contact with a sleeping island. If an active island and an inactive
+island become connected through a contact or constraint, Jitter2 marks the merged island for an update
+and moves its non-static bodies back into the active partition before solving.
+
+Static bodies are a special case. They are normally inactive, do not form regular simulation island
+connections, and do not by themselves keep an island awake. Moving a static body can still wake
+affected non-static bodies so contacts can be updated on the next step.

@@ -67,7 +67,7 @@ while (stack.TryPop(out int id))
     {
         if (node.IsLeaf)
         {
-            Console.WriteLine($'{node.Proxy} contains {point}.');
+            Console.WriteLine($"{node.Proxy} contains {point}.");
         }
         else
         {
@@ -91,11 +91,11 @@ All proxies implementing `IRayCastable` can be ray cast, including all shapes:
 ```cs
 // Unbounded
 public bool RayCast(JVector origin, JVector direction, RayCastFilterPre? pre, RayCastFilterPost? post,
-    out IDynamicTreeProxy? proxy, out JVector normal, out Real lambda)
+    out IDynamicTreeProxy? proxy, out JVector normal, out float lambda)
 
 // Bounded: only considers hits with lambda ≤ maxLambda
-public bool RayCast(JVector origin, JVector direction, Real maxLambda, RayCastFilterPre? pre, RayCastFilterPost? post,
-    out IDynamicTreeProxy? proxy, out JVector normal, out Real lambda)
+public bool RayCast(JVector origin, JVector direction, float maxLambda, RayCastFilterPre? pre, RayCastFilterPost? post,
+    out IDynamicTreeProxy? proxy, out JVector normal, out float lambda)
 ```
 
 The pre- and post-filters can be used to discard hits during the ray cast.
@@ -111,13 +111,13 @@ All proxies implementing `ISweepTestable` can be sweep-tested, including all sha
 // Unbounded
 public bool SweepCast<T>(in T support, in JQuaternion orientation, in JVector position, in JVector direction,
     SweepCastFilterPre? pre, SweepCastFilterPost? post,
-    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out Real lambda)
+    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out float lambda)
     where T : ISupportMappable
 
 // Bounded: only considers hits with lambda ≤ maxLambda
-public bool SweepCast<T>(in T support, in JQuaternion orientation, in JVector position, in JVector direction, Real maxLambda,
+public bool SweepCast<T>(in T support, in JQuaternion orientation, in JVector position, in JVector direction, float maxLambda,
     SweepCastFilterPre? pre, SweepCastFilterPost? post,
-    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out Real lambda)
+    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out float lambda)
     where T : ISupportMappable
 ```
 
@@ -140,10 +140,10 @@ Returning `false` from either filter skips that candidate without terminating th
 For common built-in query shapes, convenience overloads are available:
 
 ```cs
-public bool SweepCastSphere(Real radius, in JVector position, in JVector direction, ...)
+public bool SweepCastSphere(float radius, in JVector position, in JVector direction, ...)
 public bool SweepCastBox(in JVector halfExtents, in JQuaternion orientation, in JVector position, in JVector direction, ...)
-public bool SweepCastCapsule(Real radius, Real halfLength, in JQuaternion orientation, in JVector position, in JVector direction, ...)
-public bool SweepCastCylinder(Real radius, Real halfHeight, in JQuaternion orientation, in JVector position, in JVector direction, ...)
+public bool SweepCastCapsule(float radius, float halfLength, in JQuaternion orientation, in JVector position, in JVector direction, ...)
+public bool SweepCastCylinder(float radius, float halfHeight, in JQuaternion orientation, in JVector position, in JVector direction, ...)
 ```
 
 Each has a bounded variant with a `maxLambda` parameter.
@@ -156,13 +156,13 @@ All proxies implementing `IDistanceTestable` can be distance-queried, including 
 // Unbounded: considers all IDistanceTestable proxies in the tree
 public bool FindNearest<T>(in T support, in JQuaternion orientation, in JVector position,
     FindNearestFilterPre? pre, FindNearestFilterPost? post,
-    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out Real distance)
+    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out float distance)
     where T : ISupportMappable
 
 // Bounded: only considers proxies closer than maxDistance
-public bool FindNearest<T>(in T support, in JQuaternion orientation, in JVector position, Real maxDistance,
+public bool FindNearest<T>(in T support, in JQuaternion orientation, in JVector position, float maxDistance,
     FindNearestFilterPre? pre, FindNearestFilterPost? post,
-    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out Real distance)
+    out IDynamicTreeProxy? proxy, out JVector pointA, out JVector pointB, out JVector normal, out float distance)
     where T : ISupportMappable
 ```
 
@@ -191,7 +191,7 @@ For common built-in query shapes, convenience overloads are available:
 
 ```cs
 public bool FindNearestPoint(in JVector position, ...)
-public bool FindNearestSphere(Real radius, in JVector position, ...)
+public bool FindNearestSphere(float radius, in JVector position, ...)
 ```
 
 Each has a bounded variant with a `maxDistance` parameter.
