@@ -20,10 +20,10 @@ public class CollisionManifoldTests
         out JVector pointA, out JVector pointB, out JVector normal, out Real penetration)
         where Ta : ISupportMappable where Tb : ISupportMappable
     {
-        bool hit = NarrowPhase.Collision(shapeA, shapeB, orientationA, orientationB, positionA, positionB,
+        NarrowPhaseResult result = NarrowPhase.Collision(shapeA, shapeB, orientationA, orientationB, positionA, positionB,
             out pointA, out pointB, out normal, out penetration);
 
-        Assert.That(hit, Is.True);
+        Assert.That(result, Is.EqualTo(NarrowPhaseResult.Hit));
 
         CollisionManifold manifold = default;
         manifold.BuildManifold(shapeA, shapeB, orientationA, orientationB, positionA, positionB, pointA, pointB, normal);
@@ -193,12 +193,12 @@ public class CollisionManifoldTests
 
         JQuaternion orientationB = JQuaternion.CreateRotationY((Real)(MathR.PI / 4.0));
         JVector worldOffset = new JVector((Real)10_000.0, (Real)(-20_000.0), (Real)30_000.0);
-        bool hit = NarrowPhase.Collision(shapeA, shapeB,
+        NarrowPhaseResult result = NarrowPhase.Collision(shapeA, shapeB,
             JQuaternion.Identity, orientationB,
             JVector.Zero, new JVector(0, (Real)1.9, 0),
             out JVector pointA, out JVector pointB, out JVector normal, out _);
 
-        Assert.That(hit, Is.True);
+        Assert.That(result, Is.EqualTo(NarrowPhaseResult.Hit));
 
         CollisionManifold nearOrigin = default;
         nearOrigin.BuildManifold(shapeA, shapeB,

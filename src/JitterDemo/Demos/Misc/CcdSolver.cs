@@ -105,12 +105,12 @@ public class CcdSolver
             float extentB = MathF.Max((pshape.WorldBoundingBox.Max - pshape.RigidBody.Position).Length(),
                 (pshape.WorldBoundingBox.Min - pshape.RigidBody.Position).Length());
 
-            bool success = NarrowPhase.Sweep(shape, pshape, data.Orientation, pdata.Orientation,
+            NarrowPhaseResult sweepResult = NarrowPhase.Sweep(shape, pshape, data.Orientation, pdata.Orientation,
                 data.Position, pdata.Position, data.Velocity, pdata.Velocity,
                 data.AngularVelocity, pdata.AngularVelocity, extentA, extentB,
                 out JVector pA, out JVector pB, out JVector normal, out float toi);
 
-            if (!success || toi > dt || toi == (float)0.0) continue;
+            if (sweepResult != NarrowPhaseResult.Hit || toi > dt || toi == (float)0.0) continue;
 
             if (world.NarrowPhaseFilter != null)
             {

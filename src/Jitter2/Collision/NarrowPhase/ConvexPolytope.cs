@@ -288,7 +288,7 @@ public unsafe struct ConvexPolytope
     /// <remarks>
     /// The first four vertices must be set before calling this method.
     /// </remarks>
-    public void InitTetrahedron()
+    public bool InitTetrahedron()
     {
         originEnclosed = false;
         vPointer = 4;
@@ -296,10 +296,10 @@ public unsafe struct ConvexPolytope
 
         center = (Real)0.25 * (vertices[0].V + vertices[1].V + vertices[2].V + vertices[3].V);
 
-        CreateTriangle(0, 2, 1);
-        CreateTriangle(0, 1, 3);
-        CreateTriangle(0, 3, 2);
-        CreateTriangle(1, 2, 3);
+        return CreateTriangle(0, 2, 1) &&
+               CreateTriangle(0, 1, 3) &&
+               CreateTriangle(0, 3, 2) &&
+               CreateTriangle(1, 2, 3);
     }
 
     /// <summary>

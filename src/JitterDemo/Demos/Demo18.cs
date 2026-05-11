@@ -24,9 +24,9 @@ public class Demo18 : IDemo, IDrawUpdate
                 {
                     JVector point = new JVector(i, e, k) * 0.1f;
 
-                    bool result = NarrowPhase.PointTest(testShape, ori, JVector.Zero, point);
+                    NarrowPhaseResult result = NarrowPhase.PointTest(testShape, ori, JVector.Zero, point);
 
-                    if (result)
+                    if (result == NarrowPhaseResult.Hit)
                     {
                         pg.DebugRenderer.PushPoint(DebugRenderer.Color.White,
                             Conversion.FromJitter(point), 0.01f);

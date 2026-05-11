@@ -187,10 +187,10 @@ public class HeightmapDetection : IBroadPhaseFilter
 
                 JVector normal = JVector.Normalize((triangle.B - triangle.A) % (triangle.C - triangle.A));
 
-                bool hit = NarrowPhase.MprEpa(triangle, rbs, body.Orientation, body.Position,
+                NarrowPhaseResult result = NarrowPhase.MprEpa(triangle, rbs, body.Orientation, body.Position,
                     out JVector pointA, out JVector pointB, out _, out float penetration);
 
-                if (hit)
+                if (result == NarrowPhaseResult.Hit)
                 {
                     world.RegisterContact(rbs.ShapeId, minIndex + index, world.NullBody, rbs.RigidBody,
                         pointA, pointB, normal);
@@ -205,10 +205,10 @@ public class HeightmapDetection : IBroadPhaseFilter
 
                 normal = JVector.Normalize((triangle.B - triangle.A) % (triangle.C - triangle.A));
 
-                hit = NarrowPhase.MprEpa(triangle, rbs, body.Orientation, body.Position,
+                result = NarrowPhase.MprEpa(triangle, rbs, body.Orientation, body.Position,
                     out pointA, out pointB, out _, out penetration);
 
-                if (hit)
+                if (result == NarrowPhaseResult.Hit)
                 {
                     world.RegisterContact(rbs.ShapeId, minIndex + index, world.NullBody, rbs.RigidBody,
                         pointA, pointB, normal);
