@@ -65,7 +65,7 @@ public class RenderWindow : GLFWWindow
             DefaultFontSize = 18f,
             FontStack = UiFont.Merge(
                 UiFont.Source(UiFonts.DefaultSans),
-                UiFont.Source(MaterialSymbols.Font, offsetY: 4f)),
+                UiFont.Source(MaterialSymbols.Font, offsetY: 2f)),
             Lcd = true,
             Platform = new UiPlatform(this)
         };
