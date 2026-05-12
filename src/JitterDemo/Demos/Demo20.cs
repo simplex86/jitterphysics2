@@ -96,10 +96,10 @@ public class CustomCollisionDetection : IBroadPhaseFilter
             ts.B = octree.Vertices[octree.Indices[index].IndexB];
             ts.C = octree.Vertices[octree.Indices[index].IndexC];
 
-            NarrowPhaseResult result = NarrowPhase.MprEpa(ts, rbs, rbs.RigidBody!.Orientation, rbs.RigidBody!.Position,
+            bool hit = NarrowPhase.MprEpa(ts, rbs, rbs.RigidBody!.Orientation, rbs.RigidBody!.Position,
                 out JVector pointA, out JVector pointB, out _, out float penetration);
 
-            if (result == NarrowPhaseResult.Hit)
+            if (hit)
             {
                 JVector normal = JVector.Normalize(JVector.Cross(ts.B - ts.A, ts.C - ts.A));
 

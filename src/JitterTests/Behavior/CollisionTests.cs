@@ -26,8 +26,8 @@ public class CollisionTests
             JQuaternion.CreateRotationX((Real)0.2), JVector.UnitY * (Real)3.0,
             out JVector pA, out JVector pB, out JVector normal, out Real dist);
 
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Separated));
-        Assert.That(separated, Is.EqualTo(NarrowPhaseResult.Separated));
+        Assert.That(!overlap);
+        Assert.That(separated, Is.True);
 
         Assert.That(MathR.Abs(dist - (Real)1.5) < (Real)1e-4);
         Assert.That(MathHelper.CloseToZero(pA - new JVector(0, (Real)0.5, 0), (Real)1e-4));
@@ -40,8 +40,8 @@ public class CollisionTests
             JQuaternion.CreateRotationX((Real)0.2), JVector.UnitY * (Real)0.5,
             out pA, out pB, out normal, out dist);
 
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Hit));
-        Assert.That(separated, Is.EqualTo(NarrowPhaseResult.Hit));
+        Assert.That(overlap);
+        Assert.That(separated, Is.False);
 
         JVector delta = new JVector(10, 13, -22);
 
@@ -52,8 +52,8 @@ public class CollisionTests
             JQuaternion.CreateRotationX((Real)0.2), delta,
             out pA, out pB, out normal, out dist);
 
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Separated));
-        Assert.That(separated, Is.EqualTo(NarrowPhaseResult.Separated));
+        Assert.That(!overlap);
+        Assert.That(separated, Is.True);
 
         Assert.That(MathR.Abs(dist - delta.Length() + 2) < (Real)1e-4);
         Assert.That(MathHelper.CloseToZero(pA - JVector.Normalize(delta), (Real)1e-4));
@@ -126,13 +126,13 @@ public class CollisionTests
 
         SphereShape s1 = new(radius);
 
-        NarrowPhaseResult result = NarrowPhase.RayCast(s1, JQuaternion.CreateRotationX((Real)0.32), sp,
+        bool hit = NarrowPhase.RayCast(s1, JQuaternion.CreateRotationX((Real)0.32), sp,
             op, sp - op, out Real lambda, out JVector normal);
 
         JVector cn = JVector.Normalize(op - sp); // analytical normal
         JVector hp = op + (sp - op) * lambda; // hit point
 
-        Assert.That(result, Is.EqualTo(NarrowPhaseResult.Hit));
+        Assert.That(hit, Is.True);
         Assert.That(MathHelper.CloseToZero(normal - cn, (Real)1e-6));
 
         Real distance = (hp - sp).Length();
@@ -148,12 +148,12 @@ public class CollisionTests
         var rot = JQuaternion.CreateRotationZ(MathR.PI / (Real)4.0);
         var sweep = JVector.Normalize(new JVector(1, 1, 0));
 
-        NarrowPhaseResult result = NarrowPhase.Sweep(s1, s2, rot, rot,
+        bool hit = NarrowPhase.Sweep(s1, s2, rot, rot,
             new JVector(1, 1, 3), new JVector(11, 11, 3),
             sweep, -(Real)2.0 * sweep,
             out JVector pA, out JVector pB, out JVector normal, out Real lambda);
 
-        Assert.That(result, Is.EqualTo(NarrowPhaseResult.Hit));
+        Assert.That(hit, Is.True);
 
         Real expectedlambda = (MathR.Sqrt((Real)200.0) - (Real)1.0) * ((Real)(1.0 / 3.0));
         JVector expectedNormal = JVector.Normalize(new JVector(1, 1, 0));
@@ -182,7 +182,7 @@ public class CollisionTests
         body.Orientation = JQuaternion.CreateRotationZ(MathR.PI / (Real)4.0);
         body.Position = new JVector(11, 11, 3);
 
-        NarrowPhaseResult narrowResult = NarrowPhase.Sweep(query, target,
+        bool narrowHit = NarrowPhase.Sweep(query, target,
             orientation, body.Orientation,
             position, body.Position,
             sweep, JVector.Zero,
@@ -192,8 +192,7 @@ public class CollisionTests
             orientation, position, sweep,
             out JVector castA, out JVector castB, out JVector castNormal, out Real castLambda);
 
-        Assert.That(narrowResult, Is.EqualTo(NarrowPhaseResult.Hit));
-        Assert.That(castHit, Is.True);
+        Assert.That(castHit, Is.EqualTo(narrowHit));
         Assert.That((castA - narrowA).LengthSquared(), Is.LessThan((Real)1e-6));
         Assert.That((castB - narrowB).LengthSquared(), Is.LessThan((Real)1e-6));
         Assert.That((castNormal - narrowNormal).LengthSquared(), Is.LessThan((Real)1e-6));
@@ -212,19 +211,19 @@ public class CollisionTests
 
         var overlap = NarrowPhase.Overlap(ts, sphere,
             JQuaternion.Identity, JVector.Zero);
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Separated));
+        Assert.That(!overlap);
 
         var separated = NarrowPhase.Distance(ts, sphere,
             JQuaternion.Identity, JVector.Zero,
             out JVector pA, out JVector pB, out JVector normal, out Real dist);
-        Assert.That(separated, Is.EqualTo(NarrowPhaseResult.Separated));
+        Assert.That(separated, Is.True);
         Assert.That(dist, Is.GreaterThan((Real)0.0));
 
         var tsClose = new TransformedShape(box, new JVector(0, (Real)0.5, 0), rotation);
 
         overlap = NarrowPhase.Overlap(tsClose, sphere,
             JQuaternion.Identity, JVector.Zero);
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Hit));
+        Assert.That(overlap);
     }
 
     [TestCase]
@@ -237,15 +236,15 @@ public class CollisionTests
 
         var overlap = NarrowPhase.Overlap(ts, probe,
             JQuaternion.Identity, new JVector((Real)1.2, 0, 0));
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Hit));
+        Assert.That(overlap);
 
         overlap = NarrowPhase.Overlap(ts, probe,
             JQuaternion.Identity, new JVector((Real)1.7, 0, 0));
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Separated));
+        Assert.That(!overlap);
 
         overlap = NarrowPhase.Overlap(ts, probe,
             JQuaternion.Identity, new JVector(0, (Real)0.7, 0));
-        Assert.That(overlap, Is.EqualTo(NarrowPhaseResult.Separated));
+        Assert.That(!overlap);
     }
 
     [TestCase]
@@ -257,7 +256,7 @@ public class CollisionTests
         // -----------------------------------------------
 
         Assert.That(NarrowPhase.MprEpa(s1, s2, JQuaternion.Identity, JQuaternion.Identity, new JVector(-(Real)0.25, 0, 0), new JVector(+(Real)0.25, 0, 0),
-            out JVector pointA, out JVector pointB, out JVector normal, out Real penetration), Is.EqualTo(NarrowPhaseResult.Hit));
+            out JVector pointA, out JVector pointB, out JVector normal, out Real penetration), Is.True);
 
         // pointA is on s1 and pointB is on s2
         Assert.That(pointA.X, Is.GreaterThan((Real)0.0));
@@ -272,7 +271,7 @@ public class CollisionTests
         // -----------------------------------------------
 
         Assert.That(NarrowPhase.Collision(s1, s2, JQuaternion.Identity, JQuaternion.Identity, new JVector(-(Real)0.25, 0, 0), new JVector(+(Real)0.25, 0, 0),
-            out pointA, out pointB, out normal, out penetration), Is.EqualTo(NarrowPhaseResult.Hit));
+            out pointA, out pointB, out normal, out penetration), Is.True);
 
         // pointA is on s1 and pointB is on s2
         Assert.That(pointA.X, Is.GreaterThan(0));
@@ -290,7 +289,7 @@ public class CollisionTests
         BoxShape b2 = new(1);
 
         Assert.That(NarrowPhase.MprEpa(b1, b2, JQuaternion.Identity, JQuaternion.Identity, new JVector(-(Real)0.25, (Real)0.1, 0), new JVector(+(Real)0.25, -(Real)0.1, 0),
-            out pointA, out pointB, out normal, out penetration), Is.EqualTo(NarrowPhaseResult.Hit));
+            out pointA, out pointB, out normal, out penetration), Is.True);
 
         // pointA is on s1 and pointB is on s2
         Assert.That(pointA.X, Is.GreaterThan(0));
@@ -305,7 +304,7 @@ public class CollisionTests
         // -----------------------------------------------
 
         Assert.That(NarrowPhase.Collision(b1, b2, JQuaternion.Identity, JQuaternion.Identity, new JVector(-(Real)2.25, 0, 0), new JVector(+(Real)2.25, 0, 0),
-            out pointA, out pointB, out normal, out penetration), Is.EqualTo(NarrowPhaseResult.Separated));
+            out pointA, out pointB, out normal, out penetration), Is.True);
 
         // the collision normal points from s2 to s1
         Assert.That(normal.X, Is.GreaterThan(0));

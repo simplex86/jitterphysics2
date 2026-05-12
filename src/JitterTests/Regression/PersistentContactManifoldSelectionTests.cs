@@ -17,10 +17,10 @@ public class PersistentContactManifoldSelectionTests
         shapeB = new BoxShape(new JVector(2, 2, 2));
         bodyB.AddShape(shapeB);
 
-        NarrowPhaseResult result = NarrowPhase.Collision(shapeA, shapeB, bodyA.Orientation, bodyB.Orientation, bodyA.Position, bodyB.Position,
+        bool hit = NarrowPhase.Collision(shapeA, shapeB, bodyA.Orientation, bodyB.Orientation, bodyA.Position, bodyB.Position,
             out JVector pointA, out JVector pointB, out normal, out _);
 
-        Assert.That(result, Is.EqualTo(NarrowPhaseResult.Hit));
+        Assert.That(hit, Is.True);
 
         manifold = default;
         manifold.BuildManifold(shapeA, shapeB, pointA, pointB, normal);

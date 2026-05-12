@@ -125,10 +125,10 @@ public sealed partial class World
 
         bool speculative = sA.RigidBody.EnableSpeculativeContacts || sB.RigidBody.EnableSpeculativeContacts;
 
-        NarrowPhaseResult collisionResult = NarrowPhase.MprEpa(sA, sB, b1.Orientation, b2.Orientation, b1.Position, b2.Position,
+        var colliding = NarrowPhase.MprEpa(sA, sB, b1.Orientation, b2.Orientation, b1.Position, b2.Position,
             out JVector pA, out JVector pB, out JVector normal, out var penetration);
 
-        if (collisionResult != NarrowPhaseResult.Hit)
+        if (!colliding)
         {
             if (!speculative) return;
 
@@ -136,12 +136,12 @@ public sealed partial class World
 
             if (dv.LengthSquared() < SpeculativeVelocityThreshold * SpeculativeVelocityThreshold) return;
 
-            NarrowPhaseResult sweepResult = NarrowPhase.Sweep(sA, sB, b1.Orientation, b2.Orientation,
+            bool success = NarrowPhase.Sweep(sA, sB, b1.Orientation, b2.Orientation,
                 b1.Position, b2.Position, b1.Velocity, b2.Velocity,
                 out pA, out pB, out normal, out Real toi);
 
             // ReSharper disable once CompareOfFloatsByEqualityOperator
-            if (sweepResult != NarrowPhaseResult.Hit || toi > stepDt || toi == (Real)0.0) return;
+            if (!success || toi > stepDt || toi == (Real)0.0) return;
 
             penetration = normal * (pA - pB) * SpeculativeRelaxationFactor;
 

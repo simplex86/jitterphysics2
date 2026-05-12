@@ -31,19 +31,19 @@ public abstract class SoftBodyShape : Shape
     /// <inheritdoc/>
     public override bool RayCast(in JVector origin, in JVector direction, out JVector normal, out Real lambda)
     {
-        return NarrowPhase.RayCast(this, origin, direction, out lambda, out normal) == NarrowPhaseResult.Hit;
+        return NarrowPhase.RayCast(this, origin, direction, out lambda, out normal);
     }
 
     /// <inheritdoc/>
     public override bool Sweep<T>(in T support, in JQuaternion orientation, in JVector position, in JVector sweep,
         out JVector pointA, out JVector pointB, out JVector normal, out Real lambda)
     {
-        NarrowPhaseResult result = NarrowPhase.Sweep(this, support,
+        bool hit = NarrowPhase.Sweep(this, support,
             orientation, position, sweep,
             out pointB, out pointA, out normal, out lambda);
 
         JVector.NegateInPlace(ref normal);
-        return result == NarrowPhaseResult.Hit;
+        return hit;
     }
 
     /// <inheritdoc/>
@@ -53,6 +53,6 @@ public abstract class SoftBodyShape : Shape
         return NarrowPhase.Distance(support, this,
             orientation, JQuaternion.Identity,
             position, JVector.Zero,
-            out pointA, out pointB, out normal, out distance) == NarrowPhaseResult.Separated;
+            out pointA, out pointB, out normal, out distance);
     }
 }

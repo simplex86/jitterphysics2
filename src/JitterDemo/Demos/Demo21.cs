@@ -231,11 +231,11 @@ public class VoxelCollisionFilter : IBroadPhaseFilter
                         CollisionVoxel voxel = new CollisionVoxel(voxelPos);
 
                         // NarrowPhase: Box vs Voxel
-                        NarrowPhaseResult result = NarrowPhase.MprEpa(voxel, rbs,
+                        bool hit = NarrowPhase.MprEpa(voxel, rbs,
                             rbs.RigidBody!.Orientation, rbs.RigidBody!.Position,
                             out JVector pointA, out JVector pointB, out JVector normal, out float penetration);
 
-                        if (result == NarrowPhaseResult.Hit)
+                        if (hit)
                         {
                             // "Internal Edge" Smoothing
                             // Discard contacts that push against internal edges of the mesh

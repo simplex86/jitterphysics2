@@ -157,13 +157,13 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
             // but with zero epa threshold parameter. This is necessary since
             // MPR is not exact for flat shapes, like triangles.
 
-            NarrowPhaseResult result = NarrowPhase.MprEpa(shapeA, shapeB,
+            bool result = NarrowPhase.MprEpa(shapeA, shapeB,
                 b1Data.Orientation, b2Data.Orientation,
                 b1Data.Position, b2Data.Position,
                 out pointA, out pointB, out normal, out penetration,
                 epaThreshold: (Real)0.0);
 
-            if (result != NarrowPhaseResult.Hit)
+            if (!result)
             {
                 // this should not happen
                 return false;

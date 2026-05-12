@@ -44,11 +44,11 @@ public class BroadPhaseCollisionFilter : IBroadPhaseFilter
 
             if (!i1.SoftBody.IsActive && !i2.SoftBody.IsActive) return false;
 
-            NarrowPhaseResult collisionResult = NarrowPhase.MprEpa(i1, i2,
+            bool colliding = NarrowPhase.MprEpa(i1, i2,
                 JQuaternion.Identity, JVector.Zero,
                 out JVector pA, out JVector pB, out JVector normal, out _);
 
-            if (collisionResult != NarrowPhaseResult.Hit) return false;
+            if (!colliding) return false;
 
             var closestA = i1.GetClosest(pA);
             var closestB = i2.GetClosest(pB);
@@ -65,10 +65,10 @@ public class BroadPhaseCollisionFilter : IBroadPhaseFilter
 
             if (!i1.SoftBody.IsActive && !rb.Data.IsActive) return false;
 
-            NarrowPhaseResult collisionResult = NarrowPhase.MprEpa(i1, (proxyB as RigidBodyShape)!, rb.Orientation, rb.Position,
+            bool colliding = NarrowPhase.MprEpa(i1, (proxyB as RigidBodyShape)!, rb.Orientation, rb.Position,
                 out JVector pA, out JVector pB, out JVector normal, out _);
 
-            if (collisionResult != NarrowPhaseResult.Hit) return false;
+            if (!colliding) return false;
 
             var closest = i1.GetClosest(pA);
 
@@ -84,10 +84,10 @@ public class BroadPhaseCollisionFilter : IBroadPhaseFilter
 
             if (!i2.SoftBody.IsActive && !ra.Data.IsActive) return false;
 
-            NarrowPhaseResult collisionResult = NarrowPhase.MprEpa(i2, (proxyA as RigidBodyShape)!, ra.Orientation, ra.Position,
+            bool colliding = NarrowPhase.MprEpa(i2, (proxyA as RigidBodyShape)!, ra.Orientation, ra.Position,
                 out JVector pA, out JVector pB, out JVector normal, out _);
 
-            if (collisionResult != NarrowPhaseResult.Hit) return false;
+            if (!colliding) return false;
 
             var closest = i2.GetClosest(pA);
 

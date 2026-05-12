@@ -51,12 +51,12 @@ public class Demo26 : IDemo, IDrawUpdate
 
         cr.Push(MatrixHelper.CreateScale(10, 10, 0.1f), new Vector3(0.2f, 0.2f, 0.2f));
 
-        NarrowPhaseResult result = NarrowPhase.Sweep(staticBar, dynamicBox, JQuaternion.Identity, JQuaternion.Identity,
+        bool res = NarrowPhase.Sweep(staticBar, dynamicBox, JQuaternion.Identity, JQuaternion.Identity,
             JVector.Zero, position,
             JVector.Zero, velocity, JVector.Zero, angularVelocity, 10, 10,
             out JVector posA, out JVector posB, out JVector normal, out float lambda);
 
-        if (result != NarrowPhaseResult.Hit) return;
+        if (!res) return;
 
         for (int i = 0; i <= 10; i++)
         {

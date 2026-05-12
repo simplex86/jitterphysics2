@@ -13,27 +13,6 @@ using Vertex = Jitter2.Collision.MinkowskiDifference.Vertex;
 namespace Jitter2.Collision;
 
 /// <summary>
-/// Describes the outcome of a narrow-phase query.
-/// </summary>
-public enum NarrowPhaseResult
-{
-    /// <summary>
-    /// The query could not produce a reliable result.
-    /// </summary>
-    Failed,
-
-    /// <summary>
-    /// The query proved the tested objects are separated, or that a ray/sweep missed.
-    /// </summary>
-    Separated,
-
-    /// <summary>
-    /// The query found an overlap, containment, ray hit, or sweep time of impact.
-    /// </summary>
-    Hit
-}
-
-/// <summary>
 /// Provides collision detection algorithms for convex shapes defined by support functions.
 /// </summary>
 /// <remarks>
@@ -54,14 +33,14 @@ public static class NarrowPhase
         private ConvexPolytope convexPolytope;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private NarrowPhaseResult SolveMprEpa<Ta,Tb>(in Ta supportA, in Tb supportB, in JQuaternion orientationB, in JVector positionB,
+        private bool SolveMprEpa<Ta,Tb>(in Ta supportA, in Tb supportB, in JQuaternion orientationB, in JVector positionB,
             ref JVector point1, ref JVector point2, ref JVector normal, ref Real penetration)
             where Ta : ISupportMappable where Tb : ISupportMappable
         {
             const Real collideEpsilon = (Real)1e-5;
             const int maxIter = 85;
 
-            if (!convexPolytope.InitTetrahedron()) return NarrowPhaseResult.Failed;
+            convexPolytope.InitTetrahedron();
 
             int iter = 0;
 
@@ -99,7 +78,7 @@ public static class NarrowPhase
 
             Logger.Warning("{0}: EPA, Could not converge within {1} iterations.", nameof(NarrowPhase), maxIter);
 
-            return NarrowPhaseResult.Failed;
+            return false;
 
             converged:
 
@@ -108,30 +87,11 @@ public static class NarrowPhase
             normal = ctri.Normal * ((Real)1.0 / MathR.Sqrt(ctri.NormalSq));
             penetration = MathR.Sqrt(ctri.ClosestToOriginSq);
 
-            return NarrowPhaseResult.Hit;
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-        private static NarrowPhaseResult DegenerateHit(in Vertex vertex, in JVector fallbackNormal,
-            out JVector pointA, out JVector pointB, out JVector normal, out Real penetration)
-        {
-            pointA = vertex.A;
-            pointB = vertex.B;
-            normal = JVector.NormalizeSafe(fallbackNormal, NumericEpsilon);
-            if (normal.LengthSquared() < NumericEpsilon) normal = JVector.UnitX;
-            penetration = (Real)0.0;
-            return NarrowPhaseResult.Hit;
-        }
-
-        private static NarrowPhaseResult NoContact(NarrowPhaseResult result,
-            out JVector pointA, out JVector pointB, out JVector normal, out Real penetration)
-        {
-            pointA = pointB = normal = JVector.Zero;
-            penetration = (Real)0.0;
-            return result;
-        }
-
-        public NarrowPhaseResult SolveMpr<Ta,Tb>(in Ta supportA, in Tb supportB, in JQuaternion orientationB,
+        public bool SolveMpr<Ta,Tb>(in Ta supportA, in Tb supportB, in JQuaternion orientationB,
             in JVector positionB, Real epaThreshold,
             out JVector pointA, out JVector pointB, out JVector normal, out Real penetration)
             where Ta : ISupportMappable where Tb : ISupportMappable
@@ -173,7 +133,6 @@ public static class NarrowPhase
             Unsafe.SkipInit(out JVector temp2);
             Unsafe.SkipInit(out JVector temp3);
 
-            pointA = pointB = normal = JVector.Zero;
             penetration = (Real)0.0;
 
             MinkowskiDifference.GetCenter(supportA, supportB, orientationB, positionB, out v0);
@@ -190,18 +149,10 @@ public static class NarrowPhase
 
             MinkowskiDifference.Support(supportA, supportB, orientationB, positionB, normal, out v1);
 
-            Real supportDot = JVector.Dot(v1.V, normal);
-            if (supportDot <= (Real)0.0)
-            {
-                if (v1.V.LengthSquared() < NumericEpsilon)
-                {
-                    return DegenerateHit(v1, normal, out pointA, out pointB, out normal, out penetration);
-                }
+            pointA = v1.A;
+            pointB = v1.B;
 
-                return NoContact(supportDot < -NumericEpsilon ? NarrowPhaseResult.Separated : NarrowPhaseResult.Failed,
-                    out pointA, out pointB, out normal, out penetration);
-            }
-
+            if (JVector.Dot(v1.V, normal) <= (Real)0.0) return false;
             JVector.Cross(v1.V, v0.V, out normal);
 
             const Real sphericalEpsilon = (Real)1e-12;
@@ -215,24 +166,12 @@ public static class NarrowPhase
                 JVector.Subtract(v1.A, v1.B, out temp1);
                 penetration = JVector.Dot(temp1, normal);
 
-                pointA = v1.A;
-                pointB = v1.B;
-                return NarrowPhaseResult.Hit;
+                return true;
             }
 
             MinkowskiDifference.Support(supportA, supportB, orientationB, positionB, normal, out v2);
 
-            supportDot = JVector.Dot(v2.V, normal);
-            if (supportDot <= (Real)0.0)
-            {
-                if (v2.V.LengthSquared() < NumericEpsilon)
-                {
-                    return DegenerateHit(v2, normal, out pointA, out pointB, out normal, out penetration);
-                }
-
-                return NoContact(supportDot < -NumericEpsilon ? NarrowPhaseResult.Separated : NarrowPhaseResult.Failed,
-                    out pointA, out pointB, out normal, out penetration);
-            }
+            if (JVector.Dot(v2.V, normal) <= (Real)0.0) return false;
 
             // Determine whether the origin is on + or - side of plane (v1.V, v0.V, v2.V)
             JVector.Subtract(v1.V, v0.V, out temp1);
@@ -257,30 +196,15 @@ public static class NarrowPhase
             // Phase One: Identify a portal
             while (true)
             {
-                if (phase1 > maxIter)
-                {
-                    return NoContact(NarrowPhaseResult.Failed, out pointA, out pointB, out normal, out penetration);
-                }
+                if (phase1 > maxIter) return false;
 
                 phase1++;
 
-                if (normal.LengthSquared() < NumericEpsilon)
-                {
-                    return NoContact(NarrowPhaseResult.Failed, out pointA, out pointB, out normal, out penetration);
-                }
-
                 MinkowskiDifference.Support(supportA, supportB, orientationB, positionB, normal, out v3);
 
-                supportDot = JVector.Dot(v3.V, normal);
-                if (supportDot <= (Real)0.0)
+                if (JVector.Dot(v3.V, normal) <= (Real)0.0)
                 {
-                    if (v3.V.LengthSquared() < NumericEpsilon)
-                    {
-                        return DegenerateHit(v3, normal, out pointA, out pointB, out normal, out penetration);
-                    }
-
-                    return NoContact(supportDot < -NumericEpsilon ? NarrowPhaseResult.Separated : NarrowPhaseResult.Failed,
-                        out pointA, out pointB, out normal, out penetration);
+                    return false;
                 }
 
                 // If origin is outside (v1.V,v0.V,v3.V), then eliminate v2.V and loop
@@ -325,7 +249,10 @@ public static class NarrowPhase
                 // Can this happen???  Can it be handled more cleanly?
                 if (normalSq < NumericEpsilon)
                 {
-                    return NoContact(NarrowPhaseResult.Failed, out pointA, out pointB, out normal, out penetration);
+                    // was: return true;
+                    // better not return a collision
+                    Debug.Assert(false, "MPR: This should not happen.");
+                    return false;
                 }
 
                 if (!hit)
@@ -344,9 +271,8 @@ public static class NarrowPhase
 
                 // If the boundary is thin enough, the origin is outside the support plane for the newly discovered
                 // vertex, or the maximum number of iterations has been reached, then we can terminate
-                bool reachedMaxIterations = phase2 > maxIter;
                 if (delta * delta <= collideEpsilon * collideEpsilon * normalSq || penetration <= (Real)0.0 ||
-                    reachedMaxIterations)
+                    phase2 > maxIter)
                 {
                     if (hit)
                     {
@@ -362,9 +288,9 @@ public static class NarrowPhase
                             convexPolytope.GetVertex(2) = v2;
                             convexPolytope.GetVertex(3) = v3;
 
-                            NarrowPhaseResult epaResult = SolveMprEpa(supportA, supportB, orientationB, positionB,
-                                ref pointA, ref pointB, ref normal, ref penetration);
-                            if (epaResult == NarrowPhaseResult.Hit) return NarrowPhaseResult.Hit;
+                            // If epa fails it does not set any result data. We continue with the mpr data.
+                            if (SolveMprEpa(supportA, supportB, orientationB, positionB,
+                                    ref pointA, ref pointB, ref normal, ref penetration)) return true;
                         }
 
                         normal *= invnormal;
@@ -380,9 +306,7 @@ public static class NarrowPhase
                         pointB = alpha * v1.B + beta * v2.B + gamma * v3.B;
                     }
 
-                    if (hit) return NarrowPhaseResult.Hit;
-                    return NoContact(reachedMaxIterations ? NarrowPhaseResult.Failed : NarrowPhaseResult.Separated,
-                        out pointA, out pointB, out normal, out penetration);
+                    return hit;
                 }
 
                 // Compute the tetrahedron dividing face (v4.V, v0.V, v3.V)
@@ -419,7 +343,7 @@ public static class NarrowPhase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public NarrowPhaseResult Collision<Ta,Tb>(in Ta supportA, in Tb supportB, in JQuaternion orientationB, in JVector positionB,
+        public bool Collision<Ta,Tb>(in Ta supportA, in Tb supportB, in JQuaternion orientationB, in JVector positionB,
             out JVector point1, out JVector point2, out JVector normal, out Real penetration)
             where Ta : ISupportMappable where Tb : ISupportMappable
         {
@@ -476,9 +400,9 @@ public static class NarrowPhase
             point1 = point2 = normal = JVector.Zero;
             penetration = (Real)0.0;
 
-            Logger.Warning("{0}: EPA, Could not converge within {1} iterations.", nameof(NarrowPhase), maxIter);
+            Logger.Warning("{0}: EPA, Could not converge within {1} iterations.\"", nameof(NarrowPhase), maxIter);
 
-            return NarrowPhaseResult.Failed;
+            return false;
 
             converged:
 
@@ -490,7 +414,7 @@ public static class NarrowPhase
             if (MathR.Abs(penetration) > NumericEpsilon) normal = ctri.ClosestToOrigin * ((Real)1.0 / penetration);
             else normal = ctri.Normal * ((Real)1.0 / MathR.Sqrt(ctri.NormalSq));
 
-            return penetration >= (Real)0.0 ? NarrowPhaseResult.Hit : NarrowPhaseResult.Separated;
+            return true;
         }
     }
 
@@ -502,10 +426,9 @@ public static class NarrowPhase
     /// </summary>
     /// <param name="support">Support map representing the shape.</param>
     /// <param name="point">Point to check.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the point is contained within the shape,
-    /// <see cref="NarrowPhaseResult.Separated"/> otherwise.</returns>
+    /// <returns>Returns true if the point is contained within the shape, false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult PointTest<Ta>(in Ta support, in JVector point) where Ta : ISupportMappable
+    public static bool PointTest<Ta>(in Ta support, in JVector point) where Ta : ISupportMappable
     {
         const Real collideEpsilon = (Real)1e-4;
         const int maxIter = 34;
@@ -531,7 +454,7 @@ public static class NarrowPhase
 
             if (vw >= (Real)0.0)
             {
-                return NarrowPhaseResult.Separated;
+                return false;
             }
 
             if (!simplexSolver.AddVertex(w, out v))
@@ -544,7 +467,7 @@ public static class NarrowPhase
 
         converged:
 
-        return NarrowPhaseResult.Hit;
+        return true;
     }
 
     /// <summary>
@@ -554,10 +477,9 @@ public static class NarrowPhase
     /// <param name="orientation">Orientation of the shape.</param>
     /// <param name="position">Position of the shape.</param>
     /// <param name="point">Point to check.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the point is contained within the shape,
-    /// <see cref="NarrowPhaseResult.Separated"/> otherwise.</returns>
+    /// <returns>Returns true if the point is contained within the shape, false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult PointTest<Ta>(in Ta support, in JMatrix orientation,
+    public static bool PointTest<Ta>(in Ta support, in JMatrix orientation,
         in JVector position, in JVector point) where Ta : ISupportMappable
     {
         JVector transformedOrigin = JVector.TransposedTransform(point - position, orientation);
@@ -578,10 +500,9 @@ public static class NarrowPhase
     /// The normalized normal vector perpendicular to the surface, pointing outwards. Zero if the ray does not hit or
     /// the ray origin is inside the shape.
     /// </param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the ray intersects with the shape,
-    /// <see cref="NarrowPhaseResult.Separated"/> if it misses.</returns>
+    /// <returns>Returns true if the ray intersects with the shape; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult RayCast<Ta>(in Ta support, in JQuaternion orientation,
+    public static bool RayCast<Ta>(in Ta support, in JQuaternion orientation,
         in JVector position, in JVector origin, in JVector direction, out Real lambda, out JVector normal)
         where Ta : ISupportMappable
     {
@@ -589,7 +510,7 @@ public static class NarrowPhase
         JVector transformedDir = JVector.ConjugatedTransform(direction, orientation);
         JVector transformedOrigin = JVector.ConjugatedTransform(origin - position, orientation);
 
-        NarrowPhaseResult result = RayCast(support, transformedOrigin, transformedDir, out lambda, out normal);
+        bool result = RayCast(support, transformedOrigin, transformedDir, out lambda, out normal);
 
         // ...rotate back.
         JVector.Transform(normal, orientation, out normal);
@@ -609,10 +530,9 @@ public static class NarrowPhase
     /// The normalized normal vector perpendicular to the surface, pointing outwards. Zero if the ray does not hit or
     /// the ray origin is inside the shape.
     /// </param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the ray intersects with the shape,
-    /// <see cref="NarrowPhaseResult.Separated"/> if it misses.</returns>
+    /// <returns>Returns true if the ray intersects with the shape; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult RayCast<Ta>(in Ta support, in JVector origin, in JVector direction,
+    public static bool RayCast<Ta>(in Ta support, in JVector origin, in JVector direction,
         out Real lambda, out JVector normal) where Ta : ISupportMappable
     {
         const Real collideEpsilon = (Real)1e-4;
@@ -649,7 +569,7 @@ public static class NarrowPhase
                 if (vdotR >= -NumericEpsilon)
                 {
                     lambda = Real.PositiveInfinity;
-                    return NarrowPhaseResult.Separated;
+                    return false;
                 }
 
                 lambda -= vdotW / vdotR;
@@ -671,7 +591,7 @@ public static class NarrowPhase
         converged:
 
         normal = JVector.NormalizeSafe(in normal, NumericEpsilon);
-        return NarrowPhaseResult.Hit;
+        return true;
     }
 
     /// <summary>
@@ -699,20 +619,20 @@ public static class NarrowPhase
     /// </param>
     /// <param name="penetration">The penetration depth.</param>
     /// <returns>
-    /// Returns <see cref="NarrowPhaseResult.Hit"/> for overlap, <see cref="NarrowPhaseResult.Separated"/> for
-    /// separation, or <see cref="NarrowPhaseResult.Failed"/> when no reliable result could be produced.
+    /// Returns true if the algorithm completes successfully, false otherwise. In case of algorithm convergence
+    /// failure, collision information reverts to the type's default values.
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Collision<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Collision<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationB, in JVector positionB,
         out JVector pointA, out JVector pointB, out JVector normal, out Real penetration)
         where Ta : ISupportMappable where Tb : ISupportMappable
     {
         // ..perform collision detection..
-        NarrowPhaseResult result = _solver.Collision(supportA, supportB, orientationB, positionB,
+        bool success = _solver.Collision(supportA, supportB, orientationB, positionB,
             out pointA, out pointB, out normal, out penetration);
 
-        return result;
+        return success;
     }
 
     /// <summary>
@@ -741,11 +661,11 @@ public static class NarrowPhase
     /// </param>
     /// <param name="penetration">The penetration depth.</param>
     /// <returns>
-    /// Returns <see cref="NarrowPhaseResult.Hit"/> for overlap, <see cref="NarrowPhaseResult.Separated"/> for
-    /// separation, or <see cref="NarrowPhaseResult.Failed"/> when no reliable result could be produced.
+    /// Returns true if the algorithm completes successfully, false otherwise. In case of algorithm convergence
+    /// failure, collision information reverts to the type's default values.
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Collision<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Collision<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationA, in JQuaternion orientationB,
         in JVector positionA, in JVector positionB,
         out JVector pointA, out JVector pointB, out JVector normal, out Real penetration)
@@ -757,10 +677,8 @@ public static class NarrowPhase
         JVector.ConjugatedTransform(position, orientationA, out position);
 
         // ...perform collision detection...
-        NarrowPhaseResult result = _solver.Collision(supportA, supportB, orientation, position,
+        bool success = _solver.Collision(supportA, supportB, orientation, position,
             out pointA, out pointB, out normal, out penetration);
-
-        if (result == NarrowPhaseResult.Failed) return result;
 
         // ...rotate back. this hopefully saves some matrix vector multiplication
         // when calling the support function multiple times.
@@ -770,7 +688,7 @@ public static class NarrowPhase
         JVector.Add(pointB, positionA, out pointB);
         JVector.Transform(normal, orientationA, out normal);
 
-        return result;
+        return success;
     }
 
     /// <summary>
@@ -785,10 +703,10 @@ public static class NarrowPhase
     /// <param name="pointB">Closest point on shape B. Undefined for the overlapping case.</param>
     /// <param name="normal">Unit direction from shape A toward shape B. Undefined for the overlapping case.</param>
     /// <param name="distance">The distance between the separating shapes. Zero if shapes overlap.</param>
-    /// <returns><see cref="NarrowPhaseResult.Separated"/> if a positive distance could be provided,
-    /// <see cref="NarrowPhaseResult.Hit"/> if the shapes overlap or touch.</returns>
+    /// <returns>Returns true if the shapes do not overlap and distance information
+    /// can be provided.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Distance<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Distance<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationB, in JVector positionB,
         out JVector pointA, out JVector pointB, out JVector normal, out Real distance)
         where Ta : ISupportMappable where Tb : ISupportMappable
@@ -827,14 +745,14 @@ public static class NarrowPhase
         distance = MathR.Sqrt(distSq);
         normal = v * (-(Real)1.0 / distance);
         simplexSolver.GetClosest(out pointA, out pointB);
-        return NarrowPhaseResult.Separated;
+        return true;
 
         ret_false:
 
         distance = (Real)0.0;
         normal = JVector.Zero;
         simplexSolver.GetClosest(out pointA, out pointB);
-        return NarrowPhaseResult.Hit;
+        return false;
     }
 
     /// <summary>
@@ -850,10 +768,10 @@ public static class NarrowPhase
     /// <param name="pointB">Closest point on shape B. Undefined for the overlapping case.</param>
     /// <param name="normal">Unit direction from shape A toward shape B. Undefined for the overlapping case.</param>
     /// <param name="distance">The distance between the separating shapes. Zero if shapes overlap.</param>
-    /// <returns><see cref="NarrowPhaseResult.Separated"/> if a positive distance could be provided,
-    /// <see cref="NarrowPhaseResult.Hit"/> if the shapes overlap or touch.</returns>
+    /// <returns>Returns true if the shapes do not overlap and distance information
+    /// can be provided.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Distance<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Distance<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationA, in JQuaternion orientationB,
         in JVector positionA, in JVector positionB,
         out JVector pointA, out JVector pointB, out JVector normal, out Real distance)
@@ -865,7 +783,7 @@ public static class NarrowPhase
         JVector.ConjugatedTransform(position, orientationA, out position);
 
         // ...perform distance test...
-        NarrowPhaseResult result = Distance(supportA, supportB, orientation, position, out pointA, out pointB, out normal, out distance);
+        bool result = Distance(supportA, supportB, orientation, position, out pointA, out pointB, out normal, out distance);
 
         // ...rotate back. This approach potentially saves some matrix-vector multiplication when
         // the support function is called multiple times.
@@ -886,10 +804,9 @@ public static class NarrowPhase
     /// <param name="supportB">The support function of shape B.</param>
     /// <param name="orientationB">The orientation of shape B in world space.</param>
     /// <param name="positionB">The position of shape B in world space.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the shapes overlap,
-    /// <see cref="NarrowPhaseResult.Separated"/> otherwise.</returns>
+    /// <returns>Returns true of the shapes overlap, and false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Overlap<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Overlap<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationB, in JVector positionB) where Ta : ISupportMappable where Tb : ISupportMappable
     {
         // ..perform overlap test..
@@ -911,12 +828,12 @@ public static class NarrowPhase
             MinkowskiDifference.Support(supportA, supportB, orientationB, positionB, -v, out var w);
             Real vw = JVector.Dot(v, w.V);
             if (vw >= (Real)0.0)
-                return NarrowPhaseResult.Separated;
-            if (!simplexSolver.AddVertex(w, out v)) return NarrowPhaseResult.Hit;
+                return false;
+            if (!simplexSolver.AddVertex(w, out v)) return true;
             distSq = v.LengthSquared();
         }
 
-        return NarrowPhaseResult.Hit;
+        return true;
     }
 
     /// <summary>
@@ -928,10 +845,9 @@ public static class NarrowPhase
     /// <param name="orientationB">The orientation of shape B in world space.</param>
     /// <param name="positionA">The position of shape A in world space.</param>
     /// <param name="positionB">The position of shape B in world space.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the shapes overlap,
-    /// <see cref="NarrowPhaseResult.Separated"/> otherwise.</returns>
+    /// <returns>Returns true of the shapes overlap, and false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Overlap<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Overlap<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationA, in JQuaternion orientationB,
         in JVector positionA, in JVector positionB)
         where Ta : ISupportMappable where Tb : ISupportMappable
@@ -972,11 +888,9 @@ public static class NarrowPhase
     /// </param>
     /// <param name="penetration">The penetration depth.</param>
     /// <param name="epaThreshold">Penetration depth threshold above which MPR results are refined with EPA.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the shapes overlap,
-    /// <see cref="NarrowPhaseResult.Separated"/> if separation was proven, or
-    /// <see cref="NarrowPhaseResult.Failed"/> if no reliable result could be produced.</returns>
+    /// <returns>Returns true if the shapes overlap (collide), and false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult MprEpa<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool MprEpa<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationA, in JQuaternion orientationB,
         in JVector positionA, in JVector positionB,
         out JVector pointA, out JVector pointB, out JVector normal, out Real penetration,
@@ -989,15 +903,8 @@ public static class NarrowPhase
         JVector.ConjugatedTransform(position, orientationA, out position);
 
         // ..perform collision detection..
-        NarrowPhaseResult result = _solver.SolveMpr(supportA, supportB, orientation, position,
+        bool res = _solver.SolveMpr(supportA, supportB, orientation, position,
             epaThreshold, out pointA, out pointB, out normal, out penetration);
-
-        if (result != NarrowPhaseResult.Hit)
-        {
-            pointA = pointB = normal = JVector.Zero;
-            penetration = (Real)0.0;
-            return result;
-        }
 
         // ..rotate back. This approach potentially saves some matrix-vector multiplication when the support
         // function is called multiple times.
@@ -1007,7 +914,7 @@ public static class NarrowPhase
         JVector.Add(pointB, positionA, out pointB);
         JVector.Transform(normal, orientationA, out normal);
 
-        return result;
+        return res;
     }
 
     /// <summary>
@@ -1030,19 +937,16 @@ public static class NarrowPhase
     /// </param>
     /// <param name="penetration">The penetration depth.</param>
     /// <param name="epaThreshold">Penetration depth threshold above which MPR results are refined with EPA.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the shapes overlap,
-    /// <see cref="NarrowPhaseResult.Separated"/> if separation was proven, or
-    /// <see cref="NarrowPhaseResult.Failed"/> if no reliable result could be produced.</returns>
+    /// <returns>Returns true if the shapes overlap (collide), and false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult MprEpa<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool MprEpa<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationB, in JVector positionB,
         out JVector pointA, out JVector pointB, out JVector normal, out Real penetration,
         Real epaThreshold = EpaPenetrationThreshold)
         where Ta : ISupportMappable where Tb : ISupportMappable
     {
         // ..perform collision detection..
-        return _solver.SolveMpr(supportA, supportB, orientationB, positionB, epaThreshold,
-            out pointA, out pointB, out normal, out penetration);
+        return _solver.SolveMpr(supportA, supportB, orientationB, positionB , epaThreshold, out pointA, out pointB, out normal, out penetration);
     }
 
     /// <summary>
@@ -1069,16 +973,14 @@ public static class NarrowPhase
     /// overlap or do not hit.
     /// </param>
     /// <param name="lambda">Time of impact. <see cref="Real.PositiveInfinity"/> if no hit is detected. Zero if shapes overlap.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the shapes hit or already overlap,
-    /// <see cref="NarrowPhaseResult.Separated"/> if they do not hit, or
-    /// <see cref="NarrowPhaseResult.Failed"/> if no reliable time of impact could be produced.</returns>
+    /// <returns>True if the shapes hit or already overlap, false otherwise.</returns>
     /// <remarks>
     /// Uses conservative advancement for continuous collision detection. May fail to converge to the correct TOI
     /// and collision points in certain edge cases due to limitations in linear motion approximation and
     /// distance gradient estimation.
     /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Sweep<Ta, Tb>(in Ta supportA, in Tb supportB,
+    public static bool Sweep<Ta, Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationA, in JQuaternion orientationB,
         in JVector positionA, in JVector positionB,
         in JVector sweepA, in JVector sweepB,
@@ -1106,16 +1008,13 @@ public static class NarrowPhase
         JQuaternion sweepAngularDeltaA;
         JQuaternion sweepAngularDeltaB;
 
-        NarrowPhaseResult distanceResult = Distance(supportA, supportB, oriA, oriB, posA, posB,
-            out pointA, out pointB, out normal, out var distance);
+        Distance(supportA, supportB, oriA, oriB, posA, posB, out pointA, out pointB, out normal, out var distance);
 
-        if (distanceResult == NarrowPhaseResult.Failed) return NarrowPhaseResult.Failed;
-
-        if (distanceResult == NarrowPhaseResult.Hit || distance < collideEpsilon)
+        if (distance < collideEpsilon)
         {
             // We already overlap (or nearly overlap) at time 0.
-            // In this case the Sweep function should report a hit; normal and lambda are set to zero.
-            return NarrowPhaseResult.Hit;
+            // In this case the Sweep function should return true; normal and lambda are set to zero.
+            return true;
         }
 
         while (true)
@@ -1125,10 +1024,9 @@ public static class NarrowPhase
 
             if(sweepLen < NumericEpsilon || (sweepLinearProj < 0 && distance > combinedRadius))
             {
-                pointA = pointB = JVector.Zero;
                 normal = JVector.Zero;
                 lambda = Real.PositiveInfinity;
-                return NarrowPhaseResult.Separated;
+                return false;
             }
 
             Real tmpLambda = distance / sweepLen;
@@ -1146,23 +1044,15 @@ public static class NarrowPhase
             posA = positionA + sweepA * lambda;
             posB = positionB + sweepB * lambda;
 
-            if (iter++ > maxIter)
-            {
-                pointA = pointB = normal = JVector.Zero;
-                lambda = Real.PositiveInfinity;
-                return NarrowPhaseResult.Failed;
-            }
+            if (iter++ > maxIter) break;
 
-            distanceResult = Distance(supportA, supportB, oriA, oriB, posA, posB,
-                out pointA, out pointB, out JVector nn, out distance);
-
-            if (distanceResult == NarrowPhaseResult.Failed) return NarrowPhaseResult.Failed;
+            bool res = Distance(supportA, supportB, oriA, oriB, posA, posB, out pointA, out pointB, out JVector nn, out distance);
 
             // We are a bit in a pickle here.
-            // If the advanced shapes are slightly overlapping (Distance returns Hit; this can either happen if the
+            // If the advanced shapes are slightly overlapping (Distance returns false; this can either happen if the
             // simplex solver encompasses the origin or the closest point on the simplex is close enough to the origin),
             // we have valid posA and posB information, but the normal is not well-defined. So we keep the old normal.
-            if(distanceResult == NarrowPhaseResult.Separated) normal = nn;
+            if(res) normal = nn;
 
             if (distance < collideEpsilon)
                 break;
@@ -1178,7 +1068,7 @@ public static class NarrowPhase
         pointA -= linearTransformationA + (deltaA - JVector.ConjugatedTransform(deltaA, sweepAngularDeltaA));
         pointB -= linearTransformationB + (deltaB - JVector.ConjugatedTransform(deltaB, sweepAngularDeltaB));
 
-        return NarrowPhaseResult.Hit;
+        return true;
     }
 
     /// <summary>
@@ -1197,11 +1087,9 @@ public static class NarrowPhase
     /// <param name="pointB">Collision point on shape B in world space at the sweep origin.</param>
     /// <param name="normal">Normalized collision normal in world space (points from A to B). Zero if the shapes already overlap or do not hit.</param>
     /// <param name="lambda">Time of impact. <see cref="Real.PositiveInfinity"/> if no hit is detected, zero if shapes overlap.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the shapes hit or already overlap,
-    /// <see cref="NarrowPhaseResult.Separated"/> if they do not hit, or
-    /// <see cref="NarrowPhaseResult.Failed"/> if no reliable time of impact could be produced.</returns>
+    /// <returns>True if the shapes will hit or already overlap, false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Sweep<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Sweep<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationA, in JQuaternion orientationB,
         in JVector positionA, in JVector positionB,
         in JVector sweepA, in JVector sweepB,
@@ -1218,10 +1106,10 @@ public static class NarrowPhase
         JVector.ConjugatedTransform(sweep, orientationA, out sweep);
 
         // ...perform toi calculation
-        NarrowPhaseResult result = Sweep(supportA, supportB, orientation, position, sweep,
+        bool res = Sweep(supportA, supportB, orientation, position, sweep,
             out pointA, out pointB, out normal, out lambda);
 
-        if (result != NarrowPhaseResult.Hit) return result;
+        if (!res) return false;
 
         // ...rotate back. This approach potentially saves some matrix-vector multiplication when the support function is
         // called multiple times.
@@ -1239,7 +1127,7 @@ public static class NarrowPhase
 
         pointB += lambda * (sweepA - sweepB);
 
-        return NarrowPhaseResult.Hit;
+        return true;
     }
 
     /// <summary>
@@ -1254,11 +1142,9 @@ public static class NarrowPhase
     /// <param name="pointB">Collision point on shape B in world space at the sweep origin.</param>
     /// <param name="normal">Normalized collision normal in world space (points from A to B). Zero if the shapes already overlap or do not hit.</param>
     /// <param name="lambda">Time of impact. <see cref="Real.PositiveInfinity"/> if no hit is detected, zero if shapes overlap.</param>
-    /// <returns><see cref="NarrowPhaseResult.Hit"/> if the shapes hit or already overlap,
-    /// <see cref="NarrowPhaseResult.Separated"/> if they do not hit, or
-    /// <see cref="NarrowPhaseResult.Failed"/> if no reliable time of impact could be produced.</returns>
+    /// <returns>True if the shapes hit or already overlap, false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NarrowPhaseResult Sweep<Ta,Tb>(in Ta supportA, in Tb supportB,
+    public static bool Sweep<Ta,Tb>(in Ta supportA, in Tb supportB,
         in JQuaternion orientationB, in JVector positionB, in JVector sweepB,
         out JVector pointA, out JVector pointB, out JVector normal, out Real lambda)
         where Ta : ISupportMappable where Tb : ISupportMappable
@@ -1301,8 +1187,7 @@ public static class NarrowPhase
                 if (vDotR >= -(Real)1e-12)
                 {
                     lambda = Real.PositiveInfinity;
-                    pointA = pointB = normal = JVector.Zero;
-                    return NarrowPhaseResult.Separated;
+                    return false;
                 }
 
                 lambda -= vDotW / vDotR;
@@ -1321,18 +1206,11 @@ public static class NarrowPhase
             distSq = v.LengthSquared();
         }
 
-        if (distSq > collideEpsilon * collideEpsilon)
-        {
-            lambda = Real.PositiveInfinity;
-            pointA = pointB = normal = JVector.Zero;
-            return NarrowPhaseResult.Failed;
-        }
-
         converged:
 
         simplexSolver.GetClosest(out pointA, out pointB);
         normal = JVector.NormalizeSafe(in normal, NumericEpsilon);
 
-        return NarrowPhaseResult.Hit;
+        return true;
     }
 }

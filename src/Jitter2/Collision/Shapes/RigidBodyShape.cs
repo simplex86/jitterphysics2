@@ -81,7 +81,7 @@ public abstract class RigidBodyShape : Shape
     [ReferenceFrame(ReferenceFrame.Local)]
     public virtual bool LocalRayCast(in JVector origin, in JVector direction, out JVector normal, out Real lambda)
     {
-        return NarrowPhase.RayCast(this, origin, direction, out lambda, out normal) == NarrowPhaseResult.Hit;
+        return NarrowPhase.RayCast(this, origin, direction, out lambda, out normal);
     }
 
     [ReferenceFrame(ReferenceFrame.World)]
@@ -112,12 +112,12 @@ public abstract class RigidBodyShape : Shape
     {
         if (RigidBody == null)
         {
-            NarrowPhaseResult result = NarrowPhase.Sweep(this, support,
+            bool hit = NarrowPhase.Sweep(this, support,
                 orientation, position, sweep,
                 out pointB, out pointA, out normal, out lambda);
 
             JVector.NegateInPlace(ref normal);
-            return result == NarrowPhaseResult.Hit;
+            return hit;
         }
 
         ref var data = ref RigidBody.Data;
@@ -126,7 +126,7 @@ public abstract class RigidBodyShape : Shape
             orientation, data.Orientation,
             position, data.Position,
             sweep, JVector.Zero,
-            out pointA, out pointB, out normal, out lambda) == NarrowPhaseResult.Hit;
+            out pointA, out pointB, out normal, out lambda);
     }
 
     [ReferenceFrame(ReferenceFrame.World)]
@@ -138,7 +138,7 @@ public abstract class RigidBodyShape : Shape
             return NarrowPhase.Distance(support, this,
                 orientation, JQuaternion.Identity,
                 position, JVector.Zero,
-                out pointA, out pointB, out normal, out distance) == NarrowPhaseResult.Separated;
+                out pointA, out pointB, out normal, out distance);
         }
 
         ref var data = ref RigidBody.Data;
@@ -146,6 +146,6 @@ public abstract class RigidBodyShape : Shape
         return NarrowPhase.Distance(support, this,
             orientation, data.Orientation,
             position, data.Position,
-            out pointA, out pointB, out normal, out distance) == NarrowPhaseResult.Separated;
+            out pointA, out pointB, out normal, out distance);
     }
 }
