@@ -9,8 +9,8 @@ namespace JitterDemo;
 public class Demo30 : IDemo, IDrawUpdate
 {
     public string Name => "Sweep Casts";
-    public string Description => "Camera-driven sweep casts through a simple physics scene.\n" +
-                                 "Switch between sphere, box, capsule and cylinder queries\n" +
+    public string Description => "Camera-driven sweep casts through a simple physics scene. " +
+                                 "Switch between sphere, box, capsule and cylinder queries " +
                                  "to compare the impact pose for the same view direction.";
     public string Controls => "O/P - Previous/next cast type";
 
