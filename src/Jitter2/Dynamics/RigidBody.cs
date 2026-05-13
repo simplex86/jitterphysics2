@@ -178,7 +178,7 @@ public struct RigidBodyData
     /// <summary>
     /// Returns true if the body is not dynamic or currently inactive (sleeping).
     /// </summary>
-    [Obsolete($"Use {nameof(MotionType)} directly.")]
+    [Obsolete($"Use {nameof(MotionType)} directly.", true)]
     public bool IsStaticOrInactive => MotionType != MotionType.Dynamic || !IsActive;
 
     /// <summary>
@@ -744,7 +744,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         }
     }
 
-    [Obsolete($"Use the {nameof(MotionType)} property instead.")]
+    [Obsolete($"Use the {nameof(MotionType)} property instead.", true)]
     public bool IsStatic
     {
         set => MotionType = value ? MotionType.Static : MotionType.Dynamic;
@@ -897,11 +897,11 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         if (ShouldUpdateMassInertia(massInertiaMode)) SetMassInertia();
     }
     
-    [Obsolete($"Use {nameof(AddShapes)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(AddShapes)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void AddShape(IEnumerable<RigidBodyShape> shapes, bool setMassInertia = true)
         => AddShapes(shapes, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
     
-    [Obsolete($"Use {nameof(AddShape)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(AddShape)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void AddShape(RigidBodyShape shape, bool setMassInertia = true)
         => AddShape(shape, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
 
@@ -1011,10 +1011,10 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         data.AngularVelocity += JVector.Transform(angularImpulse, data.InverseInertiaWorld);
     }
     
-    [Obsolete("Use ApplyImpulse instead.")]
+    [Obsolete("Use ApplyImpulse instead.", true)]
     public void AddImpulse(in JVector impulse, bool wakeup = true) => ApplyImpulse(impulse, wakeup);
     
-    [Obsolete("Use ApplyImpulse instead.")]
+    [Obsolete("Use ApplyImpulse instead.", true)]
     public void AddImpulse(in JVector impulse, in JVector position, bool wakeup = true) => ApplyImpulse(impulse, position, wakeup);
 
     /// <summary>
@@ -1156,11 +1156,11 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         sids.Clear();
     }
     
-    [Obsolete($"Use {nameof(RemoveShape)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(RemoveShape)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void RemoveShape(RigidBodyShape shape, bool setMassInertia = true)
         => RemoveShape(shape, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
     
-    [Obsolete($"Use {nameof(RemoveShapes)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(RemoveShapes)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void RemoveShape(IEnumerable<RigidBodyShape> shapes, bool setMassInertia = true)
         => RemoveShapes(shapes, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
 
@@ -1181,7 +1181,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         RemoveShapes(InternalShapes, massInertiaMode);
     }
     
-    [Obsolete($"Use {nameof(ClearShapes)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(ClearShapes)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void ClearShapes(bool setMassInertia = true)
     {
         ClearShapes(setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);

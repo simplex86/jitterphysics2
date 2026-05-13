@@ -57,7 +57,7 @@ public partial struct JVector(Real x, Real y, Real z) : IEquatable<JVector>
         InternalZero = Zero;
     }
 
-    [Obsolete($"Do not use any longer.")]
+    [Obsolete($"Do not use any longer.", true)]
     public void Set(Real x, Real y, Real z)
     {
         X = x;
@@ -464,7 +464,7 @@ public partial struct JVector(Real x, Real y, Real z) : IEquatable<JVector>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly override int GetHashCode() => HashCode.Combine(X, Y, Z);
 
-    [Obsolete($"Use static {nameof(NegateInPlace)} instead.")]
+    [Obsolete($"Use static {nameof(NegateInPlace)} instead.", true)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Negate()
     {
@@ -542,7 +542,7 @@ public partial struct JVector(Real x, Real y, Real z) : IEquatable<JVector>
     }
 
     [Obsolete($"In-place Normalize() is deprecated; " +
-              $"use the static {nameof(JVector.Normalize)} method or {nameof(JVector.NormalizeInPlace)}.")]
+              $"use the static {nameof(JVector.Normalize)} method or {nameof(JVector.NormalizeInPlace)}.", true)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Normalize()
     {

@@ -486,7 +486,7 @@ public partial struct JQuaternion(Real x, Real y, Real z, Real w) : IEquatable<J
     /// Normalizes the quaternion to unit length.
     /// </summary>
     [Obsolete($"In-place Normalize() is deprecated; " +
-              $"use the static {nameof(JQuaternion.Normalize)} method or {nameof(JQuaternion.NormalizeInPlace)}.")]
+              $"use the static {nameof(JQuaternion.Normalize)} method or {nameof(JQuaternion.NormalizeInPlace)}.", true)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Normalize()
     {

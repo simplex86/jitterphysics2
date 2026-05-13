@@ -78,7 +78,7 @@ public struct JBoundingBox(JVector min, JVector max) : IEquatable<JBoundingBox>
     }
 
     // Prefer using CreateTransformed for clarity and to avoid mutations.
-    [Obsolete($"Use static {nameof(CreateTransformed)} instead.")]
+    [Obsolete($"Use static {nameof(CreateTransformed)} instead.", true)]
     public void Transform(in JMatrix orientation)
     {
         JVector halfExtents = (Real)0.5 * (Max - Min);
@@ -234,7 +234,7 @@ public struct JBoundingBox(JVector min, JVector max) : IEquatable<JBoundingBox>
     }
 
     // Marked obsolete to guide users toward the preferred static method.
-    [Obsolete($"Use static {nameof(AddPointInPlace)} instead.")]
+    [Obsolete($"Use static {nameof(AddPointInPlace)} instead.", true)]
     public void AddPoint(in JVector point)
     {
         JVector.Max(Max, point, out Max);
@@ -299,7 +299,7 @@ public struct JBoundingBox(JVector min, JVector max) : IEquatable<JBoundingBox>
     /// Determines whether the two boxes intersect or overlap.
     /// </summary>
     /// <returns><c>true</c> if the boxes overlap; <c>false</c> if they are disjoint.</returns>
-    [Obsolete($"Use !{nameof(Disjoint)} instead.")]
+    [Obsolete($"Use !{nameof(Disjoint)} instead.", true)]
     public static bool NotDisjoint(in JBoundingBox left, in JBoundingBox right)
     {
         return left.Max.X >= right.Min.X && left.Min.X <= right.Max.X && left.Max.Y >= right.Min.Y && left.Min.Y <= right.Max.Y &&
@@ -334,7 +334,7 @@ public struct JBoundingBox(JVector min, JVector max) : IEquatable<JBoundingBox>
     /// Determines whether the <paramref name="outer"/> box completely contains the <paramref name="inner"/> box.
     /// </summary>
     /// <remarks>This is an alias for <see cref="Contains(in JBoundingBox, in JBoundingBox)"/>.</remarks>
-    [Obsolete($"Use {nameof(Contains)} instead.")]
+    [Obsolete($"Use {nameof(Contains)} instead.", true)]
     public static bool Encompasses(in JBoundingBox outer, in JBoundingBox inner)
     {
         return outer.Min.X <= inner.Min.X && outer.Max.X >= inner.Max.X && outer.Min.Y <= inner.Min.Y && outer.Max.Y >= inner.Max.Y &&
