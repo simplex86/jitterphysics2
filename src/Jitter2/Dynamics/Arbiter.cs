@@ -31,7 +31,22 @@ namespace Jitter2.Dynamics;
 /// </remarks>
 public sealed class Arbiter
 {
-    internal static readonly Stack<Arbiter> Pool = new();
+    [ThreadStatic] private static Stack<Arbiter>? pool;
+
+    private static Stack<Arbiter> Pool => pool ??= new Stack<Arbiter>();
+
+    internal static Arbiter GetFromPool()
+    {
+        return Pool.TryPop(out var arbiter) ? arbiter : new Arbiter();
+    }
+
+    internal static void ReturnToPool(Arbiter arbiter)
+    {
+        arbiter.Handle = JHandle<ContactData>.Zero;
+        arbiter.Body1 = null!;
+        arbiter.Body2 = null!;
+        Pool.Push(arbiter);
+    }
 
     /// <summary>
     /// Gets the first rigid body involved in this contact.

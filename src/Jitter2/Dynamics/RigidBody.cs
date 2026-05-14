@@ -1309,7 +1309,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         UpdateWorldInertia();
     }
 
-    private static List<JTriangle>? _debugTriangles;
+    [ThreadStatic] private static List<JTriangle>? _debugTriangles;
 
     /// <summary>
     /// Generates a rough triangle approximation of the shapes of the body.
@@ -1323,13 +1323,13 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <param name="drawer">The debug drawer to receive the generated triangles.</param>
     public void DebugDraw(IDebugDrawer drawer)
     {
-        _debugTriangles ??= [];
+        List<JTriangle> debugTriangles = _debugTriangles ??= [];
 
         foreach (var shape in InternalShapes)
         {
-            ShapeHelper.Tessellate(shape, _debugTriangles);
+            ShapeHelper.Tessellate(shape, debugTriangles);
 
-            foreach (var tri in _debugTriangles)
+            foreach (var tri in debugTriangles)
             {
                 drawer.DrawTriangle(
                     JVector.Transform(tri.V0, Data.Orientation) + Data.Position,
@@ -1337,7 +1337,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
                     JVector.Transform(tri.V2, Data.Orientation) + Data.Position);
             }
 
-            _debugTriangles.Clear();
+            debugTriangles.Clear();
         }
     }
 

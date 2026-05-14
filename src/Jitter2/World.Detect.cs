@@ -346,10 +346,7 @@ public sealed partial class World
 
             lock (memContacts)
             {
-                if (!Arbiter.Pool.TryPop(out arbiter!))
-                {
-                    arbiter = new Arbiter();
-                }
+                arbiter = Arbiter.GetFromPool();
 
                 var handle = memContacts.Allocate(true);
                 arbiter.Handle = handle;

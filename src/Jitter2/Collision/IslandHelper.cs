@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Jitter2.Dynamics;
@@ -13,20 +14,30 @@ using IslandSet = Jitter2.DataStructures.PartitionedSet<Jitter2.Collision.Island
 namespace Jitter2.Collision;
 
 /// <summary>
-/// Helper class to update islands. The methods here are not thread-safe.
+/// Helper class to update islands. Methods must not be called concurrently for the same world.
 /// </summary>
 /// <remarks>
-/// This class uses static shared data structures (queues, lists, and an object pool),
-/// so all calls must be serialized. Islands returned to the pool are reused and must not
-/// be referenced after removal.
+/// Scratch data and pooled islands are stored per thread. Separate worlds may use this helper
+/// concurrently on different external threads as long as each individual world is not used
+/// concurrently.
 /// </remarks>
 internal static class IslandHelper
 {
-    private static readonly Stack<Island> pool = new();
+    [ThreadStatic] private static Stack<Island>? pool;
+    [ThreadStatic] private static Queue<RigidBody>? leftSearchQueue;
+    [ThreadStatic] private static Queue<RigidBody>? rightSearchQueue;
+    [ThreadStatic] private static List<RigidBody>? visitedBodiesLeft;
+    [ThreadStatic] private static List<RigidBody>? visitedBodiesRight;
+
+    private static Stack<Island> Pool => pool ??= new Stack<Island>();
+    private static Queue<RigidBody> LeftSearchQueue => leftSearchQueue ??= new Queue<RigidBody>();
+    private static Queue<RigidBody> RightSearchQueue => rightSearchQueue ??= new Queue<RigidBody>();
+    private static List<RigidBody> VisitedBodiesLeft => visitedBodiesLeft ??= [];
+    private static List<RigidBody> VisitedBodiesRight => visitedBodiesRight ??= [];
 
     private static Island GetFromPool()
     {
-        if (!pool.TryPop(out var island))
+        if (!Pool.TryPop(out var island))
         {
             island = new Island();
         }
@@ -39,7 +50,7 @@ internal static class IslandHelper
 
     private static void ReturnToPool(Island island)
     {
-        pool.Push(island);
+        Pool.Push(island);
     }
 
     public static void ArbiterCreated(IslandSet islands, Arbiter arbiter)
@@ -131,15 +142,14 @@ internal static class IslandHelper
         }
     }
 
-    private static readonly Queue<RigidBody> leftSearchQueue = [];
-    private static readonly Queue<RigidBody> rightSearchQueue = [];
-
-    private static readonly List<RigidBody> visitedBodiesLeft = [];
-    private static readonly List<RigidBody> visitedBodiesRight = [];
-
     private static void SplitIslands(IslandSet islands, RigidBody body1, RigidBody body2)
     {
         Debug.Assert(body1.InternalIsland == body2.InternalIsland, "Islands not the same or null.");
+
+        Queue<RigidBody> leftSearchQueue = LeftSearchQueue;
+        Queue<RigidBody> rightSearchQueue = RightSearchQueue;
+        List<RigidBody> visitedBodiesLeft = VisitedBodiesLeft;
+        List<RigidBody> visitedBodiesRight = VisitedBodiesRight;
 
         bool sourceIslandActive = islands.IsActive(body1.InternalIsland);
         bool sourceNeedsUpdate = body1.InternalIsland.NeedsUpdate;
@@ -154,97 +164,94 @@ internal static class IslandHelper
         body1.InternalIslandMarker = 1;
         body2.InternalIslandMarker = 2;
 
-        while (leftSearchQueue.Count > 0 && rightSearchQueue.Count > 0)
+        try
         {
-            RigidBody currentNode = leftSearchQueue.Dequeue();
-            if (currentNode.Data.MotionType != MotionType.Static)
+            while (leftSearchQueue.Count > 0 && rightSearchQueue.Count > 0)
             {
-                for (int i = 0; i < currentNode.InternalConnections.Count; i++)
+                RigidBody currentNode = leftSearchQueue.Dequeue();
+                if (currentNode.Data.MotionType != MotionType.Static)
                 {
-                    RigidBody connectedNode = currentNode.InternalConnections[i];
+                    for (int i = 0; i < currentNode.InternalConnections.Count; i++)
+                    {
+                        RigidBody connectedNode = currentNode.InternalConnections[i];
 
-                    if (connectedNode.InternalIslandMarker == 0)
-                    {
-                        leftSearchQueue.Enqueue(connectedNode);
-                        visitedBodiesLeft.Add(connectedNode);
-                        connectedNode.InternalIslandMarker = 1;
+                        if (connectedNode.InternalIslandMarker == 0)
+                        {
+                            leftSearchQueue.Enqueue(connectedNode);
+                            visitedBodiesLeft.Add(connectedNode);
+                            connectedNode.InternalIslandMarker = 1;
+                        }
+                        else if (connectedNode.InternalIslandMarker == 2)
+                        {
+                            return;
+                        }
                     }
-                    else if (connectedNode.InternalIslandMarker == 2)
+                }
+
+                currentNode = rightSearchQueue.Dequeue();
+                if (currentNode.Data.MotionType != MotionType.Static)
+                {
+                    for (int i = 0; i < currentNode.InternalConnections.Count; i++)
                     {
-                        leftSearchQueue.Clear();
-                        rightSearchQueue.Clear();
-                        goto ResetSearchStates;
+                        RigidBody connectedNode = currentNode.InternalConnections[i];
+
+                        if (connectedNode.InternalIslandMarker == 0)
+                        {
+                            rightSearchQueue.Enqueue(connectedNode);
+                            visitedBodiesRight.Add(connectedNode);
+                            connectedNode.InternalIslandMarker = 2;
+                        }
+                        else if (connectedNode.InternalIslandMarker == 1)
+                        {
+                            return;
+                        }
                     }
                 }
             }
 
-            currentNode = rightSearchQueue.Dequeue();
-            if (currentNode.Data.MotionType != MotionType.Static)
-            {
-                for (int i = 0; i < currentNode.InternalConnections.Count; i++)
-                {
-                    RigidBody connectedNode = currentNode.InternalConnections[i];
+            Island island = GetFromPool();
+            island.NeedsUpdate = sourceNeedsUpdate;
+            island.MarkedAsActive = sourceMarkedAsActive;
+            islands.Add(island, sourceIslandActive);
 
-                    if (connectedNode.InternalIslandMarker == 0)
-                    {
-                        rightSearchQueue.Enqueue(connectedNode);
-                        visitedBodiesRight.Add(connectedNode);
-                        connectedNode.InternalIslandMarker = 2;
-                    }
-                    else if (connectedNode.InternalIslandMarker == 1)
-                    {
-                        leftSearchQueue.Clear();
-                        rightSearchQueue.Clear();
-                        goto ResetSearchStates;
-                    }
+            if (leftSearchQueue.Count == 0)
+            {
+                for (int i = 0; i < visitedBodiesLeft.Count; i++)
+                {
+                    RigidBody body = visitedBodiesLeft[i];
+                    body2.InternalIsland.InternalBodies.Remove(body);
+                    island.InternalBodies.Add(body);
+                    body.InternalIsland = island;
+                }
+            }
+            else if (rightSearchQueue.Count == 0)
+            {
+                for (int i = 0; i < visitedBodiesRight.Count; i++)
+                {
+                    RigidBody body = visitedBodiesRight[i];
+                    body1.InternalIsland.InternalBodies.Remove(body);
+                    island.InternalBodies.Add(body);
+                    body.InternalIsland = island;
                 }
             }
         }
-
-        Island island = GetFromPool();
-        island.NeedsUpdate = sourceNeedsUpdate;
-        island.MarkedAsActive = sourceMarkedAsActive;
-        islands.Add(island, sourceIslandActive);
-
-        if (leftSearchQueue.Count == 0)
+        finally
         {
             for (int i = 0; i < visitedBodiesLeft.Count; i++)
             {
-                RigidBody body = visitedBodiesLeft[i];
-                body2.InternalIsland.InternalBodies.Remove(body);
-                island.InternalBodies.Add(body);
-                body.InternalIsland = island;
+                visitedBodiesLeft[i].InternalIslandMarker = 0;
             }
 
-            rightSearchQueue.Clear();
-        }
-        else if (rightSearchQueue.Count == 0)
-        {
             for (int i = 0; i < visitedBodiesRight.Count; i++)
             {
-                RigidBody body = visitedBodiesRight[i];
-                body1.InternalIsland.InternalBodies.Remove(body);
-                island.InternalBodies.Add(body);
-                body.InternalIsland = island;
+                visitedBodiesRight[i].InternalIslandMarker = 0;
             }
 
             leftSearchQueue.Clear();
+            rightSearchQueue.Clear();
+            visitedBodiesLeft.Clear();
+            visitedBodiesRight.Clear();
         }
-
-        ResetSearchStates:
-
-        for (int i = 0; i < visitedBodiesLeft.Count; i++)
-        {
-            visitedBodiesLeft[i].InternalIslandMarker = 0;
-        }
-
-        for (int i = 0; i < visitedBodiesRight.Count; i++)
-        {
-            visitedBodiesRight[i].InternalIslandMarker = 0;
-        }
-
-        visitedBodiesLeft.Clear();
-        visitedBodiesRight.Clear();
     }
 
     // Both bodies must be !static

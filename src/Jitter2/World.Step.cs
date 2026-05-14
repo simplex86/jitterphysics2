@@ -18,10 +18,18 @@ using Jitter2.Parallelization;
 using Jitter2.Unmanaged;
 using ThreadPool = Jitter2.Parallelization.ThreadPool;
 
+#if NET9_0_OR_GREATER
+using Lock = System.Threading.Lock;
+#else
+using Lock = System.Object;
+#endif
+
 namespace Jitter2;
 
 public sealed partial class World
 {
+    private static readonly Lock MultiThreadStepLock = new();
+
     // Note: A SlimBag of the reference type 'Arbiter' does not introduce GC problems (not setting
     // all elements to null when clearing) since the references for Arbiters are pooled anyway.
     private readonly SlimBag<Arbiter> deferredArbiters = [];
@@ -118,12 +126,28 @@ public sealed partial class World
     /// Set to <see langword="false"/> for single-threaded execution (useful for debugging or platforms without threading).</param>
     /// <remarks>
     /// The step is divided into <see cref="SubstepCount"/> substeps for improved stability.
+    /// Each <see cref="World"/> must not be stepped or modified concurrently from multiple external threads.
+    /// Different worlds may be stepped concurrently with <paramref name="multiThread"/> set to <see langword="false"/>.
+    /// When <paramref name="multiThread"/> is <see langword="true"/>, the step uses a process-wide worker pool;
+    /// therefore multithreaded steps are internally serialized across all worlds.
     /// Callbacks (<see cref="PreStep"/>, <see cref="PostStep"/>, etc.) are invoked on the calling thread.
     /// When <paramref name="multiThread"/> is true, <see cref="BroadPhaseFilter"/> and <see cref="NarrowPhaseFilter"/>
     /// may be called concurrently from worker threads.
     /// </remarks>
     /// <exception cref="ArgumentException">Thrown if <paramref name="dt"/> is negative.</exception>
     public void Step(Real dt, bool multiThread = true)
+    {
+        if (!multiThread)
+        {
+            StepInternal(dt, false);
+            return;
+        }
+
+        lock (MultiThreadStepLock)
+            StepInternal(dt, true);
+    }
+
+    private void StepInternal(Real dt, bool multiThread)
     {
         ThrowIfDisposed();
         AssertNullBody();
@@ -267,7 +291,8 @@ public sealed partial class World
     /// <param name="dt">The reference timestep in seconds used to scale bias and softness terms.</param>
     /// <param name="solverIterations">The number of solver iterations to execute.</param>
     /// <param name="relaxationIterations">The number of relaxation iterations to execute after solving.</param>
-    /// <param name="multiThread">If <see langword="true"/>, uses the internal thread pool for parallel execution.</param>
+    /// <param name="multiThread">If <see langword="true"/>, uses the internal thread pool for parallel execution.
+    /// Multithreaded calls are internally serialized across all worlds because the worker pool is process-wide.</param>
     /// <remarks>
     /// Unlike <see cref="Step"/>, this method does not perform broadphase or narrowphase collision detection,
     /// does not integrate forces, and does not integrate positions or orientations. It only processes the
@@ -281,6 +306,18 @@ public sealed partial class World
     /// or <paramref name="relaxationIterations"/> is negative.
     /// </exception>
     public void Stabilize(Real dt, int solverIterations, int relaxationIterations = 0, bool multiThread = true)
+    {
+        if (!multiThread)
+        {
+            StabilizeInternal(dt, solverIterations, relaxationIterations, false);
+            return;
+        }
+
+        lock (MultiThreadStepLock)
+            StabilizeInternal(dt, solverIterations, relaxationIterations, true);
+    }
+
+    private void StabilizeInternal(Real dt, int solverIterations, int relaxationIterations, bool multiThread)
     {
         ThrowIfDisposed();
         AssertNullBody();
@@ -776,8 +813,7 @@ public sealed partial class World
             arb.Body1.RaiseEndCollide(arb);
             arb.Body2.RaiseEndCollide(arb);
 
-            Arbiter.Pool.Push(arb);
-            arb.Handle = JHandle<ContactData>.Zero;
+            Arbiter.ReturnToPool(arb);
         }
 
         brokenArbiters.Clear();
