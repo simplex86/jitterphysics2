@@ -72,14 +72,29 @@ This adjusts the number of additional (with respect to the main thread) worker t
 The `world.ThreadModel` property may be used to keep the thread pool in a tight loop waiting for work to be processed after `world.Step` has been run (`ThreadModelType.Persistent`), or to yield threads afterwards (`ThreadModelType.Regular`).
 The latter option is recommended to free processing power for other code, such as rendering.
 
-Each individual `World` instance has a single external owner at a time: do not call `Step`, `Stabilize`, or topology-changing APIs on the same world concurrently.
-Different worlds can be stepped concurrently from different host threads when they use `multiThread: false`.
+#### Threading Contract
+
+Each `World` instance has a single external owner at a time.
+Do not call `Step`, `Stabilize`, `CreateRigidBody`, `CreateConstraint`, `Remove`, `Clear`, or other world-changing APIs on the same world concurrently from multiple external threads.
+Also avoid reading world state from one thread while another thread is stepping or modifying that same world.
+
+Multiple worlds may be stepped concurrently from different host threads when every world uses single-threaded stepping:
+
+```cs
+world.Step(dt, multiThread: false);
+world.Stabilize(dt, iterations, multiThread: false);
+```
+
 This is the recommended setup when an application wants to parallelize many independent worlds.
 
 > [!WARNING]
 > `world.Step(dt, multiThread: true)` and `world.Stabilize(..., multiThread: true)` use Jitter's process-wide worker pool.
 > If several worlds call these methods at the same time, Jitter serializes the calls with a process-wide lock: one multithreaded step runs while the others wait.
 > To step many independent worlds in parallel, run those worlds on your own host threads and call `world.Step(dt, multiThread: false)` for each world.
+
+Callbacks and global hooks shared by multiple worlds must be thread-safe.
+When separate worlds are stepped concurrently, Jitter may invoke shared callbacks from different external threads at the same time.
+This includes `Logger.Listener`, broad-phase and narrow-phase filters, collision callbacks, step callbacks, and debug drawers.
 
 ## Solver Mode
 
