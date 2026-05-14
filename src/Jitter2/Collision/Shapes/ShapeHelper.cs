@@ -146,20 +146,20 @@ public static class ShapeHelper
 
     #region Obsolete MakeHull - Use Tessellate instead
 
-    [Obsolete("Use Tessellate instead.")]
+    [Obsolete("Use Tessellate instead.", true)]
     public static List<JTriangle> MakeHull(IEnumerable<JVector> vertices, int subdivisions = 3) =>
         Tessellate(vertices, subdivisions);
 
-    [Obsolete("Use Tessellate instead.")]
+    [Obsolete("Use Tessellate instead.", true)]
     public static List<JTriangle> MakeHull(ReadOnlySpan<JVector> vertices, int subdivisions = 3) =>
         Tessellate(vertices, subdivisions);
 
-    [Obsolete("Use Tessellate instead.")]
+    [Obsolete("Use Tessellate instead.", true)]
     public static List<JTriangle> MakeHull<TSupport>(in TSupport support, int subdivisions = 3)
         where TSupport : ISupportMappable =>
         Tessellate(in support, subdivisions);
 
-    [Obsolete("Use Tessellate instead.")]
+    [Obsolete("Use Tessellate instead.", true)]
     public static void MakeHull<TSupport, TCollection>(in TSupport support, TCollection hullCollection, int subdivisions = 3)
         where TSupport : ISupportMappable
         where TCollection : class, ICollection<JTriangle> =>

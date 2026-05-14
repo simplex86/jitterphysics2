@@ -10,8 +10,8 @@ namespace JitterDemo;
 public class Demo26 : IDemo, IDrawUpdate
 {
     public string Name => "Angular Sweep";
-    public string Description => "Visualizes NarrowPhase.Sweep with angular velocity.\n" +
-                                 "A rotating box sweeps toward a static bar, showing\n" +
+    public string Description => "Visualizes NarrowPhase.Sweep with angular velocity. " +
+                                 "A rotating box sweeps toward a static bar, showing " +
                                  "interpolated orientations up to the time of impact.";
     public string Controls => "O/P - Move sweep origin forward/backward";
 

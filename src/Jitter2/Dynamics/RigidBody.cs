@@ -178,7 +178,7 @@ public struct RigidBodyData
     /// <summary>
     /// Returns true if the body is not dynamic or currently inactive (sleeping).
     /// </summary>
-    [Obsolete($"Use {nameof(MotionType)} directly.")]
+    [Obsolete($"Use {nameof(MotionType)} directly.", true)]
     public bool IsStaticOrInactive => MotionType != MotionType.Dynamic || !IsActive;
 
     /// <summary>
@@ -664,6 +664,16 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         }
     }
 
+    private void ClearQueuedForces()
+    {
+        Force = JVector.Zero;
+        Torque = JVector.Zero;
+
+        ref RigidBodyData data = ref Data;
+        data.DeltaVelocity = JVector.Zero;
+        data.DeltaAngularVelocity = JVector.Zero;
+    }
+
     /// <summary>
     /// Gets or sets how the rigid body participates in the simulation.
     /// </summary>
@@ -672,6 +682,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <list type="bullet">
     /// <item><description>Switching to <see cref="MotionType.Static"/> zeroes velocities, removes connections, and deactivates the body.</description></item>
     /// <item><description>Switching from <see cref="MotionType.Static"/> rebuilds connections from existing contacts.</description></item>
+    /// <item><description>Any queued forces, torques, and force-derived velocity changes are discarded.</description></item>
     /// <item><description>Dynamic bodies use their mass and inertia; static and kinematic bodies are treated as having infinite mass by the solver.</description></item>
     /// </list>
     /// </remarks>
@@ -686,6 +697,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
             switch (value)
             {
                 case MotionType.Static:
+                    ClearQueuedForces();
                     // Switch to static
                     World.RemoveConnections(this);
                     Data.MotionType = MotionType.Static;
@@ -697,6 +709,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
                     break;
                 case MotionType.Kinematic:
                 {
+                    ClearQueuedForces();
                     // Switch to kinematic
                     if (Data.MotionType == MotionType.Static)
                     {
@@ -712,6 +725,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
                 }
                 case MotionType.Dynamic:
                 {
+                    ClearQueuedForces();
                     // Switch to dynamic
                     if (Data.MotionType == MotionType.Static)
                     {
@@ -730,7 +744,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         }
     }
 
-    [Obsolete($"Use the {nameof(MotionType)} property instead.")]
+    [Obsolete($"Use the {nameof(MotionType)} property instead.", true)]
     public bool IsStatic
     {
         set => MotionType = value ? MotionType.Static : MotionType.Dynamic;
@@ -883,11 +897,11 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         if (ShouldUpdateMassInertia(massInertiaMode)) SetMassInertia();
     }
     
-    [Obsolete($"Use {nameof(AddShapes)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(AddShapes)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void AddShape(IEnumerable<RigidBodyShape> shapes, bool setMassInertia = true)
         => AddShapes(shapes, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
     
-    [Obsolete($"Use {nameof(AddShape)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(AddShape)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void AddShape(RigidBodyShape shape, bool setMassInertia = true)
         => AddShape(shape, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
 
@@ -997,10 +1011,10 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         data.AngularVelocity += JVector.Transform(angularImpulse, data.InverseInertiaWorld);
     }
     
-    [Obsolete("Use ApplyImpulse instead.")]
+    [Obsolete("Use ApplyImpulse instead.", true)]
     public void AddImpulse(in JVector impulse, bool wakeup = true) => ApplyImpulse(impulse, wakeup);
     
-    [Obsolete("Use ApplyImpulse instead.")]
+    [Obsolete("Use ApplyImpulse instead.", true)]
     public void AddImpulse(in JVector impulse, in JVector position, bool wakeup = true) => ApplyImpulse(impulse, position, wakeup);
 
     /// <summary>
@@ -1142,11 +1156,11 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         sids.Clear();
     }
     
-    [Obsolete($"Use {nameof(RemoveShape)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(RemoveShape)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void RemoveShape(RigidBodyShape shape, bool setMassInertia = true)
         => RemoveShape(shape, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
     
-    [Obsolete($"Use {nameof(RemoveShapes)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(RemoveShapes)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void RemoveShape(IEnumerable<RigidBodyShape> shapes, bool setMassInertia = true)
         => RemoveShapes(shapes, setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
 
@@ -1167,7 +1181,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         RemoveShapes(InternalShapes, massInertiaMode);
     }
     
-    [Obsolete($"Use {nameof(ClearShapes)} with {nameof(MassInertiaUpdateMode)} instead.")]
+    [Obsolete($"Use {nameof(ClearShapes)} with {nameof(MassInertiaUpdateMode)} instead.", true)]
     public void ClearShapes(bool setMassInertia = true)
     {
         ClearShapes(setMassInertia ? MassInertiaUpdateMode.Update : MassInertiaUpdateMode.Preserve);
@@ -1295,7 +1309,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         UpdateWorldInertia();
     }
 
-    private static List<JTriangle>? _debugTriangles;
+    [ThreadStatic] private static List<JTriangle>? _debugTriangles;
 
     /// <summary>
     /// Generates a rough triangle approximation of the shapes of the body.
@@ -1309,13 +1323,13 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <param name="drawer">The debug drawer to receive the generated triangles.</param>
     public void DebugDraw(IDebugDrawer drawer)
     {
-        _debugTriangles ??= [];
+        List<JTriangle> debugTriangles = _debugTriangles ??= [];
 
         foreach (var shape in InternalShapes)
         {
-            ShapeHelper.Tessellate(shape, _debugTriangles);
+            ShapeHelper.Tessellate(shape, debugTriangles);
 
-            foreach (var tri in _debugTriangles)
+            foreach (var tri in debugTriangles)
             {
                 drawer.DrawTriangle(
                     JVector.Transform(tri.V0, Data.Orientation) + Data.Position,
@@ -1323,7 +1337,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
                     JVector.Transform(tri.V2, Data.Orientation) + Data.Position);
             }
 
-            _debugTriangles.Clear();
+            debugTriangles.Clear();
         }
     }
 

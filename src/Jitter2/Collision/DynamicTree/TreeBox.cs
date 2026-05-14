@@ -104,7 +104,7 @@ public struct TreeBox : IEquatable<TreeBox>
     /// </summary>
     /// <param name="box">The box to check against.</param>
     /// <returns><c>true</c> if the boxes overlap; <c>false</c> if they are completely separated.</returns>
-    [Obsolete($"Use !{nameof(Disjoint)} instead.")]
+    [Obsolete($"Use !{nameof(Disjoint)} instead.", true)]
     public readonly bool NotDisjoint(in JBoundingBox box)
     {
         return Max.X >= box.Min.X && Min.X <= box.Max.X && Max.Y >= box.Min.Y && Min.Y <= box.Max.Y &&
@@ -137,7 +137,7 @@ public struct TreeBox : IEquatable<TreeBox>
     /// Determines whether this box completely encloses the specified box.
     /// </summary>
     /// <remarks>This is an alias for <see cref="Contains(in JBoundingBox)"/>.</remarks>
-    [Obsolete($"Use {nameof(Contains)} instead.")]
+    [Obsolete($"Use {nameof(Contains)} instead.", true)]
     public readonly bool Encompasses(in JBoundingBox box)
     {
         return Min.X <= box.Min.X && Max.X >= box.Max.X && Min.Y <= box.Min.Y && Max.Y >= box.Max.Y &&
@@ -311,7 +311,7 @@ public struct TreeBox : IEquatable<TreeBox>
     /// <param name="first">The first box.</param>
     /// <param name="second">The second box.</param>
     /// <returns><c>true</c> if the boxes intersect; <c>false</c> if they are disjoint.</returns>
-    [Obsolete($"Use !{nameof(Disjoint)} instead.")]
+    [Obsolete($"Use !{nameof(Disjoint)} instead.", true)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool NotDisjoint(in TreeBox first, in TreeBox second)
     {

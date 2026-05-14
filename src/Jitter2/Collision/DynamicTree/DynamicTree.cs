@@ -526,6 +526,13 @@ public partial class DynamicTree
 
     [ThreadStatic] private static Stack<int>? _stack;
 
+    private static Stack<int> QueryStack => _stack ??= new Stack<int>(256);
+
+    private static void PopTo(Stack<int> stack, int count)
+    {
+        while (stack.Count > count) stack.Pop();
+    }
+
     /// <summary>
     /// Queries the tree for proxies intersecting a ray and appends all hits to the specified sink.
     /// </summary>
@@ -538,12 +545,13 @@ public partial class DynamicTree
     {
         if (root == NullNode) return;
 
-        _stack ??= new Stack<int>(256);
-        _stack.Push(root);
+        Stack<int> stack = QueryStack;
+        int baseCount = stack.Count;
+        stack.Push(root);
 
-        while (_stack.Count > 0)
+        while (stack.Count > baseCount)
         {
-            int index = _stack.Pop();
+            int index = stack.Pop();
             ref Node node = ref nodes[index];
 
             if (node.IsLeaf)
@@ -561,16 +569,14 @@ public partial class DynamicTree
 
             if (nodes[left].ExpandedBox.RayIntersect(rayOrigin, rayDirection, out _))
             {
-                _stack.Push(left);
+                stack.Push(left);
             }
 
             if (nodes[right].ExpandedBox.RayIntersect(rayOrigin, rayDirection, out _))
             {
-                _stack.Push(right);
+                stack.Push(right);
             }
         }
-
-        _stack.Clear();
     }
 
     /// <summary>
@@ -586,12 +592,13 @@ public partial class DynamicTree
 
         var sbox = new TreeBox(box);
 
-        _stack ??= new Stack<int>(256);
-        _stack.Push(root);
+        Stack<int> stack = QueryStack;
+        int baseCount = stack.Count;
+        stack.Push(root);
 
-        while (_stack.Count > 0)
+        while (stack.Count > baseCount)
         {
-            int index = _stack.Pop();
+            int index = stack.Pop();
             ref Node node = ref nodes[index];
 
             if (node.IsLeaf)
@@ -609,16 +616,14 @@ public partial class DynamicTree
 
             if (!TreeBox.Disjoint(nodes[left].ExpandedBox, sbox))
             {
-                _stack.Push(left);
+                stack.Push(left);
             }
 
             if (!TreeBox.Disjoint(nodes[right].ExpandedBox, sbox))
             {
-                _stack.Push(right);
+                stack.Push(right);
             }
         }
-
-        _stack.Clear();
     }
 
     /// <summary>

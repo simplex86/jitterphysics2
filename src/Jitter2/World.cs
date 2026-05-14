@@ -24,6 +24,12 @@ namespace Jitter2;
 /// <summary>
 /// Represents a simulation environment that holds and manages the state of all simulation objects.
 /// </summary>
+/// <remarks>
+/// A single <see cref="World"/> instance must not be stepped or modified concurrently from multiple
+/// external threads. Different worlds may be stepped concurrently with <c>multiThread: false</c>.
+/// Calls using <c>multiThread: true</c> are internally serialized across all worlds because they share
+/// the process-wide Jitter worker pool.
+/// </remarks>
 public sealed partial class World : IDisposable
 {
     /// <summary>
@@ -480,11 +486,7 @@ public sealed partial class World : IDisposable
         brokenArbiters.Remove(arbiter.Handle);
         memContacts.Free(arbiter.Handle);
 
-        arbiter.Handle = JHandle<ContactData>.Zero;
-        arbiter.Body1 = null!;
-        arbiter.Body2 = null!;
-
-        Arbiter.Pool.Push(arbiter);
+        Arbiter.ReturnToPool(arbiter);
     }
 
     /// <summary>

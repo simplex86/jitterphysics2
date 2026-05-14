@@ -28,6 +28,9 @@ public static class NarrowPhase
 {
     private const Real NumericEpsilon = (Real)1e-16;
 
+    // Contract: GJK- and MPR-based queries report geometric yes/no results; they do not expose
+    // an algorithm-failed state. EPA is the only step that may fail to converge. MPR refinement falls back
+    // to the MPR result if EPA fails, while 'NarrowPhase.Collision' documents false as EPA/convergence failure.
     private struct MprEpaSolver
     {
         private ConvexPolytope convexPolytope;

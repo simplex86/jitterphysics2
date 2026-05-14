@@ -5,9 +5,9 @@
  */
 
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Jitter2.Unmanaged;
 
 namespace Jitter2.Dynamics.Constraints;
@@ -111,7 +111,7 @@ internal static unsafe class ConstraintDispatchTable
     }
 
     private static readonly object Sync = new();
-    private static readonly List<Entry> Entries = [default];
+    private static Entry[] entries = [default];
 
     public static uint Register(
         delegate*<ref ConstraintData, Real, void> prepare,
@@ -122,13 +122,7 @@ internal static unsafe class ConstraintDispatchTable
 
         lock (Sync)
         {
-            if (Entries.Count == int.MaxValue)
-            {
-                throw new InvalidOperationException("Too many registered constraint dispatch entries.");
-            }
-
-            Entries.Add(new Entry((nint)prepare, (nint)iterate));
-            return (uint)(Entries.Count - 1);
+            return Register((nint)prepare, (nint)iterate);
         }
     }
 
@@ -141,20 +135,31 @@ internal static unsafe class ConstraintDispatchTable
 
         lock (Sync)
         {
-            if (Entries.Count == int.MaxValue)
-            {
-                throw new InvalidOperationException("Too many registered constraint dispatch entries.");
-            }
-
-            Entries.Add(new Entry((nint)prepare, (nint)iterate));
-            return (uint)(Entries.Count - 1);
+            return Register((nint)prepare, (nint)iterate);
         }
+    }
+
+    private static uint Register(nint prepare, nint iterate)
+    {
+        Entry[] current = entries;
+        if (current.Length == int.MaxValue)
+        {
+            throw new InvalidOperationException("Too many registered constraint dispatch entries.");
+        }
+
+        Entry[] next = new Entry[current.Length + 1];
+        Array.Copy(current, next, current.Length);
+        next[current.Length] = new Entry(prepare, iterate);
+
+        Volatile.Write(ref entries, next);
+        return (uint)current.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ref readonly Entry Get(uint dispatchId)
     {
-        return ref CollectionsMarshal.AsSpan(Entries)[(int)dispatchId];
+        Entry[] table = Volatile.Read(ref entries);
+        return ref table[(int)dispatchId];
     }
 }
 
