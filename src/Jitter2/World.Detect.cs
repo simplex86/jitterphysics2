@@ -201,10 +201,16 @@ public sealed partial class World
         lock (arbiter)
         {
             memContacts.ResizeLock.EnterReadLock();
-            if (!PersistentContactManifold) arbiter.Handle.Data.UsageMask = 0;
-            arbiter.Handle.Data.AddContact(point1, point2, normal);
-            arbiter.Handle.Data.ResetMode(removeFlags);
-            memContacts.ResizeLock.ExitReadLock();
+            try
+            {
+                if (!PersistentContactManifold) arbiter.Handle.Data.UsageMask = 0;
+                arbiter.Handle.Data.AddContact(point1, point2, normal);
+                arbiter.Handle.Data.ResetMode(removeFlags);
+            }
+            finally
+            {
+                memContacts.ResizeLock.ExitReadLock();
+            }
         }
     }
 
@@ -241,20 +247,25 @@ public sealed partial class World
             // Do not add contacts while contacts might be resized
             memContacts.ResizeLock.EnterReadLock();
 
-            if (!PersistentContactManifold) arbiter.Handle.Data.UsageMask = 0;
-            arbiter.Handle.Data.ResetMode(removeFlags);
-
-            ReadOnlySpan<JVector> manifoldA = manifold.ManifoldA;
-            ReadOnlySpan<JVector> manifoldB = manifold.ManifoldB;
-
-            for (int e = 0; e < manifold.Count; e++)
+            try
             {
-                JVector mfA = manifoldA[e];
-                JVector mfB = manifoldB[e];
-                arbiter.Handle.Data.AddContact(mfA, mfB, normal);
-            }
+                if (!PersistentContactManifold) arbiter.Handle.Data.UsageMask = 0;
+                arbiter.Handle.Data.ResetMode(removeFlags);
 
-            memContacts.ResizeLock.ExitReadLock();
+                ReadOnlySpan<JVector> manifoldA = manifold.ManifoldA;
+                ReadOnlySpan<JVector> manifoldB = manifold.ManifoldB;
+
+                for (int e = 0; e < manifold.Count; e++)
+                {
+                    JVector mfA = manifoldA[e];
+                    JVector mfB = manifoldB[e];
+                    arbiter.Handle.Data.AddContact(mfA, mfB, normal);
+                }
+            }
+            finally
+            {
+                memContacts.ResizeLock.ExitReadLock();
+            }
         }
     }
 

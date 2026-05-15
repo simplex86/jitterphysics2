@@ -8,6 +8,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using Jitter2.DataStructures;
 using Jitter2.Unmanaged;
@@ -101,8 +102,14 @@ public sealed class ThreadPool
             _counter = _total;
 
             Tracer.ProfileBegin(Action);
-            Action(Parameter);
-            Tracer.ProfileEnd(Action);
+            try
+            {
+                Action(Parameter);
+            }
+            finally
+            {
+                Tracer.ProfileEnd(Action);
+            }
         }
 
         private static readonly List<Task<T>> pool = new(32);
@@ -139,6 +146,7 @@ public sealed class ThreadPool
 
     private MemoryHelper.IsolatedInt tasksLeft;
     private int threadCount;
+    private ExceptionDispatchInfo? capturedException;
 
     private static ThreadPool? _instance;
 
@@ -296,8 +304,7 @@ public sealed class ThreadPool
 
             while (myQueue.TryDequeue(out var task))
             {
-                task.Perform();
-                Interlocked.Decrement(ref tasksLeft.Value);
+                PerformTask(task);
                 performedTasks++;
             }
 
@@ -311,14 +318,32 @@ public sealed class ThreadPool
 
                     while (queues[queueIndex].TryDequeue(out var task))
                     {
-                        task.Perform();
-                        Interlocked.Decrement(ref tasksLeft.Value);
+                        PerformTask(task);
                     }
                 }
             }
 
             Thread.Sleep(0);
             mainResetEvent.Wait();
+        }
+    }
+
+    private void PerformTask(ITask task)
+    {
+        try
+        {
+            task.Perform();
+        }
+        catch (Exception exception)
+        {
+            Interlocked.CompareExchange(
+                ref capturedException,
+                ExceptionDispatchInfo.Capture(exception),
+                null);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref tasksLeft.Value);
         }
     }
 
@@ -338,6 +363,8 @@ public sealed class ThreadPool
     {
         ResumeWorkers();
 
+        Interlocked.Exchange(ref capturedException, null);
+
         int totalTasks = taskList.Count;
         Volatile.Write(ref tasksLeft.Value, totalTasks);
 
@@ -353,8 +380,7 @@ public sealed class ThreadPool
 
         while (myQueue.TryDequeue(out var task))
         {
-            task.Perform();
-            Interlocked.Decrement(ref tasksLeft.Value);
+            PerformTask(task);
         }
 
         // steal from other queues
@@ -362,14 +388,20 @@ public sealed class ThreadPool
         {
             while (queues[i].TryDequeue(out var task))
             {
-                task.Perform();
-                Interlocked.Decrement(ref tasksLeft.Value);
+                PerformTask(task);
             }
         }
 
         while (Volatile.Read(ref tasksLeft.Value) > 0)
         {
             Thread.SpinWait(1);
+        }
+
+        var exception = Volatile.Read(ref capturedException);
+        if (exception != null)
+        {
+            PauseWorkers();
+            exception.Throw();
         }
     }
 }

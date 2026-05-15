@@ -375,33 +375,53 @@ public sealed unsafe class PartitionedBuffer<T> : IDisposable where T : unmanage
         {
             ResizeLock.EnterWriteLock();
 
-            int oldSize = size;
-            size *= 2; // Dynamic doubling
+            T* newMemory = null;
+            bool published = false;
 
-            T* oldMemory = memory;
-
-            if (Aligned64) memory = (T*)MemoryHelper.AlignedAllocateHeap(size * sizeof(T), 64);
-            else memory = (T*)MemoryHelper.AllocateHeap(size * sizeof(T));
-
-            // Ensure handles are ready for the new memory range
-            EnsureHandleCapacity(size);
-
-            for (int i = 0; i < oldSize; i++)
+            try
             {
-                memory[i] = oldMemory[i];
-                // Update stable pointers to the new memory location
-                *GetHandleSlot(Unsafe.Read<int>(&memory[i])) = &memory[i];
-            }
+                int oldSize = size;
+                int newSize = checked(size * 2);
+                T* oldMemory = memory;
 
-            for (int i = oldSize; i < size; i++)
+                if (Aligned64) newMemory = (T*)MemoryHelper.AlignedAllocateHeap(newSize * sizeof(T), 64);
+                else newMemory = (T*)MemoryHelper.AllocateHeap(newSize * sizeof(T));
+
+                // Ensure handles are ready before publishing any new data pointers.
+                EnsureHandleCapacity(newSize);
+
+                for (int i = 0; i < oldSize; i++)
+                {
+                    newMemory[i] = oldMemory[i];
+                }
+
+                for (int i = oldSize; i < newSize; i++)
+                {
+                    Unsafe.AsRef<int>(&newMemory[i]) = i;
+                }
+
+                for (int i = 0; i < oldSize; i++)
+                {
+                    *GetHandleSlot(Unsafe.Read<int>(&newMemory[i])) = &newMemory[i];
+                }
+
+                memory = newMemory;
+                size = newSize;
+                published = true;
+
+                if (Aligned64) MemoryHelper.AlignedFree(oldMemory);
+                else MemoryHelper.Free(oldMemory);
+            }
+            finally
             {
-                Unsafe.AsRef<int>(&memory[i]) = i;
+                if (!published && newMemory != null)
+                {
+                    if (Aligned64) MemoryHelper.AlignedFree(newMemory);
+                    else MemoryHelper.Free(newMemory);
+                }
+
+                ResizeLock.ExitWriteLock();
             }
-
-            if (Aligned64) MemoryHelper.AlignedFree(oldMemory);
-            else MemoryHelper.Free(oldMemory);
-
-            ResizeLock.ExitWriteLock();
         }
 
         int hdlId = Unsafe.Read<int>(&memory[Count]);
