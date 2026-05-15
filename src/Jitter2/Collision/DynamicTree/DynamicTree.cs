@@ -469,6 +469,7 @@ public partial class DynamicTree
     /// <returns>The total cost. Lower values indicate a more balanced tree.</returns>
     public double CalculateCost()
     {
+        if (root == NullNode) return 0.0d;
         return Cost(ref nodes[root]);
     }
 

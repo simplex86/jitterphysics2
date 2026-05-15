@@ -27,6 +27,21 @@ public class AddRemoveTests
     }
 
     [TestCase]
+    public void DynamicTreeCalculateCost_ReturnsZeroForEmptyTree()
+    {
+        Assert.That(world.DynamicTree.CalculateCost(), Is.EqualTo(0.0d));
+
+        var body = world.CreateRigidBody();
+        body.AddShape(new SphereShape());
+
+        Assert.That(world.DynamicTree.CalculateCost(), Is.GreaterThan(0.0d));
+
+        world.Remove(body);
+
+        Assert.That(world.DynamicTree.CalculateCost(), Is.EqualTo(0.0d));
+    }
+
+    [TestCase]
     public void RemoveStaticShape1()
     {
         Shape staticShape = new BoxShape(1000);
