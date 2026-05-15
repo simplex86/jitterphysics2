@@ -3,6 +3,7 @@
 ### Jitter 2.8.6 (2026-05-15)
 
 - Added support for using multiple `World` instances from different host threads.
+- Added `World.IslandActivated` and `World.IslandDeactivated` events for observing simulation island wake/sleep transitions.
 - Fixed deterministic solver iteration handling in `SolveMode.Deterministic`.
 - Fixed nested dynamic tree queries so callbacks may safely perform additional `RayCast`, `SweepCast`, and `FindNearest` queries.
 - Fixed stale queued forces and torques when changing a body's `MotionType`.
