@@ -160,129 +160,136 @@ public sealed partial class World
                 return; // nothing to do
         }
 
-        Tracer.ProfileBegin(TraceName.Step);
-
-        long time;
-        double invFrequency = 1.0d / Stopwatch.Frequency;
-
-        void SetTime(Timings type)
+        try
         {
-            long ctime = Stopwatch.GetTimestamp();
-            double delta = (ctime - time) * 1000.0d;
-            debugTimings[(int)type] = delta * invFrequency;
-            time = ctime;
-        }
+            Tracer.ProfileBegin(TraceName.Step);
 
-        stepDt = dt;
-        invStepDt = (Real)1.0 / dt;
-        substepDt = dt / substeps;
+            long time;
+            double invFrequency = 1.0d / Stopwatch.Frequency;
 
-        if (multiThread)
-        {
-            // Signal the thread pool to spin up threads
-            ThreadPool.Instance.ResumeWorkers();
-        }
-
-        // Start timer
-        time = Stopwatch.GetTimestamp();
-
-        Tracer.ProfileScopeBegin();
-        PreStep?.Invoke(dt);
-        Tracer.ProfileScopeEnd(TraceName.PreStep);
-        SetTime(Timings.PreStep);
-
-        // Perform narrow phase detection.
-        Tracer.ProfileBegin(TraceName.NarrowPhase);
-        DynamicTree.EnumerateOverlaps(detect, multiThread);
-        Tracer.ProfileEnd(TraceName.NarrowPhase);
-        SetTime(Timings.NarrowPhase);
-
-        Tracer.ProfileBegin(TraceName.AddArbiter);
-        HandleDeferredArbiters();
-        Tracer.ProfileEnd(TraceName.AddArbiter);
-        SetTime(Timings.AddArbiter);
-
-        Tracer.ProfileBegin(TraceName.CheckDeactivation);
-        CheckDeactivation();
-        Tracer.ProfileEnd(TraceName.CheckDeactivation);
-        SetTime(Timings.CheckDeactivation);
-        AssertIslandActivationInvariants();
-        
-        Tracer.ProfileBegin(TraceName.ReorderContacts);
-        
-        switch (SolveMode)
-        {
-            case SolveMode.Regular:
-                ReorderContacts();
-                break;
-            case SolveMode.Deterministic:
-                PrepareIslandSolveOrder();
-                break;
-        }
-
-        Tracer.ProfileEnd(TraceName.ReorderContacts);
-        SetTime(Timings.ReorderContacts);
-        
-        Tracer.ProfileBegin(TraceName.Solve);
-
-        // Sub-stepping
-        for (int i = 0; i < substeps; i++)
-        {
-            PreSubStep?.Invoke(substepDt);
-            IntegrateForces(multiThread);                       // FAST SWEEP
-
-            if (SolveMode == Jitter2.SolveMode.Deterministic)
+            void SetTime(Timings type)
             {
-                SolveIslands(multiThread, solverIterations);       // FAST SWEEP
-                IntegrateVelocities(multiThread);                  // FAST SWEEP
-                RelaxIslands(multiThread, velocityRelaxations);    // FAST SWEEP
+                long ctime = Stopwatch.GetTimestamp();
+                double delta = (ctime - time) * 1000.0d;
+                debugTimings[(int)type] = delta * invFrequency;
+                time = ctime;
             }
-            else
+
+            stepDt = dt;
+            invStepDt = (Real)1.0 / dt;
+            substepDt = dt / substeps;
+
+
+            if (multiThread)
             {
-                SolveVelocities(multiThread, solverIterations);    // FAST SWEEP
-                IntegrateVelocities(multiThread);                  // FAST SWEEP
-                RelaxVelocities(multiThread, velocityRelaxations); // FAST SWEEP
+                // Signal the thread pool to spin up threads
+                ThreadPool.Instance.ResumeWorkers();
             }
-            PostSubStep?.Invoke(substepDt);
+
+            // Start timer
+            time = Stopwatch.GetTimestamp();
+
+            Tracer.ProfileScopeBegin();
+            PreStep?.Invoke(dt);
+            Tracer.ProfileScopeEnd(TraceName.PreStep);
+            SetTime(Timings.PreStep);
+
+            // Perform narrow phase detection.
+            Tracer.ProfileBegin(TraceName.NarrowPhase);
+            DynamicTree.EnumerateOverlaps(detect, multiThread);
+            Tracer.ProfileEnd(TraceName.NarrowPhase);
+            SetTime(Timings.NarrowPhase);
+
+            Tracer.ProfileBegin(TraceName.AddArbiter);
+            HandleDeferredArbiters();
+            Tracer.ProfileEnd(TraceName.AddArbiter);
+            SetTime(Timings.AddArbiter);
+
+            Tracer.ProfileBegin(TraceName.CheckDeactivation);
+            CheckDeactivation();
+            Tracer.ProfileEnd(TraceName.CheckDeactivation);
+            SetTime(Timings.CheckDeactivation);
+            AssertIslandActivationInvariants();
+
+            Tracer.ProfileBegin(TraceName.ReorderContacts);
+
+            switch (SolveMode)
+            {
+                case SolveMode.Regular:
+                    ReorderContacts();
+                    break;
+                case SolveMode.Deterministic:
+                    PrepareIslandSolveOrder();
+                    break;
+            }
+
+            Tracer.ProfileEnd(TraceName.ReorderContacts);
+            SetTime(Timings.ReorderContacts);
+
+            Tracer.ProfileBegin(TraceName.Solve);
+
+            // Sub-stepping
+            for (int i = 0; i < substeps; i++)
+            {
+                PreSubStep?.Invoke(substepDt);
+                IntegrateForces(multiThread); // FAST SWEEP
+
+                if (SolveMode == Jitter2.SolveMode.Deterministic)
+                {
+                    SolveIslands(multiThread, solverIterations); // FAST SWEEP
+                    IntegrateVelocities(multiThread); // FAST SWEEP
+                    RelaxIslands(multiThread, velocityRelaxations); // FAST SWEEP
+                }
+                else
+                {
+                    SolveVelocities(multiThread, solverIterations); // FAST SWEEP
+                    IntegrateVelocities(multiThread); // FAST SWEEP
+                    RelaxVelocities(multiThread, velocityRelaxations); // FAST SWEEP
+                }
+
+                PostSubStep?.Invoke(substepDt);
+            }
+
+            Tracer.ProfileEnd(TraceName.Solve);
+            SetTime(Timings.Solve);
+
+            Tracer.ProfileBegin(TraceName.RemoveArbiter);
+            RemoveBrokenArbiters();
+            Tracer.ProfileEnd(TraceName.RemoveArbiter);
+            SetTime(Timings.RemoveArbiter);
+            AssertIslandActivationInvariants();
+
+            Tracer.ProfileBegin(TraceName.UpdateContacts);
+            UpdateContacts(multiThread); // FAST SWEEP
+            Tracer.ProfileEnd(TraceName.UpdateContacts);
+            SetTime(Timings.UpdateContacts);
+
+            Tracer.ProfileBegin(TraceName.UpdateBodies);
+            ForeachActiveBody(multiThread);
+            Tracer.ProfileEnd(TraceName.UpdateBodies);
+            SetTime(Timings.UpdateBodies);
+
+            Tracer.ProfileBegin(TraceName.BroadPhase);
+            DynamicTree.Update(multiThread, stepDt);
+            Tracer.ProfileEnd(TraceName.BroadPhase);
+            SetTime(Timings.BroadPhase);
+
+            Tracer.ProfileScopeBegin();
+            PostStep?.Invoke(dt);
+            Tracer.ProfileScopeEnd(TraceName.PostStep);
+            SetTime(Timings.PostStep);
         }
-
-        Tracer.ProfileEnd(TraceName.Solve);
-        SetTime(Timings.Solve);
-
-        Tracer.ProfileBegin(TraceName.RemoveArbiter);
-        RemoveBrokenArbiters();
-        Tracer.ProfileEnd(TraceName.RemoveArbiter);
-        SetTime(Timings.RemoveArbiter);
-        AssertIslandActivationInvariants();
-
-        Tracer.ProfileBegin(TraceName.UpdateContacts);
-        UpdateContacts(multiThread);                            // FAST SWEEP
-        Tracer.ProfileEnd(TraceName.UpdateContacts);
-        SetTime(Timings.UpdateContacts);
-
-        Tracer.ProfileBegin(TraceName.UpdateBodies);
-        ForeachActiveBody(multiThread);
-        Tracer.ProfileEnd(TraceName.UpdateBodies);
-        SetTime(Timings.UpdateBodies);
-
-        Tracer.ProfileBegin(TraceName.BroadPhase);
-        DynamicTree.Update(multiThread, stepDt);
-        Tracer.ProfileEnd(TraceName.BroadPhase);
-        SetTime(Timings.BroadPhase);
-
-        Tracer.ProfileScopeBegin();
-        PostStep?.Invoke(dt);
-        Tracer.ProfileScopeEnd(TraceName.PostStep);
-        SetTime(Timings.PostStep);
-
-        if ((ThreadModel == ThreadModelType.Regular || !multiThread)
-            && ThreadPool.InstanceInitialized)
+        finally
         {
-            // Signal the thread pool that threads can go into a wait state.
-            ThreadPool.Instance.PauseWorkers();
-        }
+            if ((ThreadModel == ThreadModelType.Regular || !multiThread)
+                && ThreadPool.InstanceInitialized)
+            {
+                // Signal the thread pool that threads can go into a wait state.
+                ThreadPool.Instance.PauseWorkers();
+            }
 
-        Tracer.ProfileEnd(TraceName.Step);
+            Tracer.ProfileEnd(TraceName.Step);
+        }
     }
 
     /// <summary>
@@ -340,40 +347,46 @@ public sealed partial class World
             throw new ArgumentException("Relaxation iterations can not be smaller than zero.", nameof(relaxationIterations));
         }
 
-        stepDt = dt;
-        invStepDt = (Real)1.0 / dt;
-        substepDt = dt / substeps;
-
-        if (multiThread)
+        try
         {
-            ThreadPool.Instance.ResumeWorkers();
-        }
+            stepDt = dt;
+            invStepDt = (Real)1.0 / dt;
+            substepDt = dt / substeps;
 
-        CheckDeactivation();
-
-        if (SolveMode == Jitter2.SolveMode.Deterministic)
-        {
-            PrepareIslandSolveOrder();
-
-            for (int i = 0; i < substeps; i++)
+            if (multiThread)
             {
-                SolveIslands(multiThread, solverIterations);
-                RelaxIslands(multiThread, relaxationIterations);
+                ThreadPool.Instance.ResumeWorkers();
             }
-        }
-        else
-        {
-            for (int i = 0; i < substeps; i++)
-            {
-                SolveVelocities(multiThread, solverIterations);
-                RelaxVelocities(multiThread, relaxationIterations);
-            }
-        }
 
-        if ((ThreadModel == ThreadModelType.Regular || !multiThread)
-            && ThreadPool.InstanceInitialized)
+            CheckDeactivation();
+
+            if (SolveMode == Jitter2.SolveMode.Deterministic)
+            {
+                PrepareIslandSolveOrder();
+
+                for (int i = 0; i < substeps; i++)
+                {
+                    SolveIslands(multiThread, solverIterations);
+                    RelaxIslands(multiThread, relaxationIterations);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < substeps; i++)
+                {
+                    SolveVelocities(multiThread, solverIterations);
+                    RelaxVelocities(multiThread, relaxationIterations);
+                }
+            }
+
+        }
+        finally
         {
-            ThreadPool.Instance.PauseWorkers();
+            if ((ThreadModel == ThreadModelType.Regular || !multiThread)
+                && ThreadPool.InstanceInitialized)
+            {
+                ThreadPool.Instance.PauseWorkers();
+            }
         }
     }
 
