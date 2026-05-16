@@ -156,6 +156,22 @@ public class WorldTests
     }
 
     [TestCase]
+    public void Step_WhenInterrupted_PausesThreadPool()
+    {
+        var world = new World();
+        world.PreStep += _ =>
+        {
+            Assert.That(Jitter2.Parallelization.ThreadPool.Instance.IsPaused, Is.False);
+            throw new InvalidOperationException("Interrupted step.");
+        };
+
+        Assert.Throws<InvalidOperationException>(() => world.Step(1f / 60f, true));
+
+        Assert.That(Jitter2.Parallelization.ThreadPool.Instance.IsPaused, Is.True);
+        world.Dispose();
+    }
+
+    [TestCase]
     public void Stabilize_NegativeDt_Throws()
     {
         var world = new World();
@@ -184,6 +200,32 @@ public class WorldTests
     {
         var world = new World();
         Assert.Throws<ArgumentException>(() => world.Stabilize(1f / 60f, 1, -1, false));
+        world.Dispose();
+    }
+
+    [TestCase]
+    public void Stabilize_WhenInterrupted_PausesThreadPool()
+    {
+        var world = new World
+        {
+            Gravity = JVector.Zero
+        };
+
+        var body = world.CreateRigidBody();
+        body.AddShape(new BoxShape(1));
+        body.DeactivationTime = TimeSpan.Zero;
+
+        world.Step(1f / 60f, false);
+
+        world.IslandDeactivated += _ =>
+        {
+            Assert.That(Jitter2.Parallelization.ThreadPool.Instance.IsPaused, Is.False);
+            throw new InvalidOperationException("Interrupted stabilize.");
+        };
+
+        Assert.Throws<InvalidOperationException>(() => world.Stabilize(1f / 60f, 1, 0, true));
+
+        Assert.That(Jitter2.Parallelization.ThreadPool.Instance.IsPaused, Is.True);
         world.Dispose();
     }
 

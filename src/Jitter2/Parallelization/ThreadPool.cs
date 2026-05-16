@@ -156,6 +156,15 @@ public sealed class ThreadPool
     /// <value>Includes the main thread as worker 0.</value>
     public int ThreadCount => threadCount;
 
+    /// <summary>
+    /// Gets whether worker threads have been requested to pause when idle.
+    /// </summary>
+    /// <remarks>
+    /// A value of <see langword="true"/> does not guarantee that every worker is already blocked;
+    /// workers may still be finishing previously queued work.
+    /// </remarks>
+    public bool IsPaused => !mainResetEvent.IsSet;
+
     private ThreadPool()
     {
         threadCount = 0;
