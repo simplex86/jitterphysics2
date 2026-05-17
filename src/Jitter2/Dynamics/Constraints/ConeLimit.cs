@@ -71,9 +71,10 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     public void Initialize(JVector axisBody1, JVector axisBody2, AngularLimit limit)
     {
         VerifyNotZero();
-        ArgumentOutOfRangeException.ThrowIfNegative((Real)limit.From);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan((Real)limit.To, MathR.PI);
-        ArgumentOutOfRangeException.ThrowIfLessThan((Real)limit.To, (Real)limit.From);
+        ArgumentCheck.NonZero(axisBody1, nameof(axisBody1));
+        ArgumentCheck.NonZero(axisBody2, nameof(axisBody2));
+        ArgumentCheck.InRange((Real)limit.From, (Real)0.0, MathR.PI, nameof(limit.From));
+        ArgumentCheck.InRange((Real)limit.To, (Real)limit.From, MathR.PI, nameof(limit.To));
 
         ref ConeLimitData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -155,6 +156,8 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
         }
         set
         {
+            ArgumentCheck.NonZero(value, nameof(value));
+
             ref ConeLimitData data = ref Data;
             ref RigidBodyData body1 = ref data.Body1.Data;
 
@@ -180,6 +183,8 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
         }
         set
         {
+            ArgumentCheck.NonZero(value, nameof(value));
+
             ref ConeLimitData data = ref Data;
             ref RigidBodyData body2 = ref data.Body2.Data;
 
@@ -203,9 +208,8 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
         }
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative((Real)value.From);
-            ArgumentOutOfRangeException.ThrowIfGreaterThan((Real)value.To, MathR.PI);
-            ArgumentOutOfRangeException.ThrowIfLessThan((Real)value.To, (Real)value.From);
+            ArgumentCheck.InRange((Real)value.From, (Real)0.0, MathR.PI, nameof(value.From));
+            ArgumentCheck.InRange((Real)value.To, (Real)value.From, MathR.PI, nameof(value.To));
 
             ref ConeLimitData data = ref Data;
             data.LimitLow = StableMath.Cos((Real)value.From);
@@ -273,19 +277,27 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     public Real Softness
     {
         get => Data.Softness;
-        set => Data.Softness = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.Softness = value;
+        }
     }
 
     /// <summary>
     /// Gets or sets the bias factor controlling how aggressively angular error is corrected.
     /// </summary>
     /// <value>
-    /// Default is 0.2. Range [0, 1]. Higher values correct errors faster but may cause instability.
+    /// Default is 0.2. Higher values correct errors faster but may cause instability.
     /// </value>
     public Real Bias
     {
         get => Data.BiasFactor;
-        set => Data.BiasFactor = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.BiasFactor = value;
+        }
     }
 
     /// <summary>

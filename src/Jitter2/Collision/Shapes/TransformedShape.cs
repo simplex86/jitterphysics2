@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using Jitter2.LinearMath;
 
 namespace Jitter2.Collision.Shapes;
@@ -30,9 +31,11 @@ public class TransformedShape : RigidBodyShape
     /// </summary>
     public TransformedShape(RigidBodyShape shape, in JVector translation, in JMatrix transform)
     {
+        ArgumentNullException.ThrowIfNull(shape);
+
         OriginalShape = shape;
-        this.translation = translation;
-        this.transformation = transform;
+        this.translation = ArgumentCheck.Finite(translation, nameof(translation));
+        this.transformation = ArgumentCheck.Finite(transform, nameof(transform));
 
         AnalyzeTransformation();
         UpdateWorldBoundingBox();
@@ -68,6 +71,7 @@ public class TransformedShape : RigidBodyShape
         get => translation;
         set
         {
+            DebugCheck.IsFinite(value, nameof(value));
             translation = value;
             UpdateWorldBoundingBox();
         }
@@ -94,6 +98,7 @@ public class TransformedShape : RigidBodyShape
         get => transformation;
         set
         {
+            DebugCheck.IsFinite(value, nameof(value));
             transformation = value;
             AnalyzeTransformation();
             UpdateWorldBoundingBox();

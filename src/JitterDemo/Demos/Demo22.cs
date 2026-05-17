@@ -110,8 +110,9 @@ public class Demo22 : IDemo, ICleanDemo, IDrawUpdate
             // Align initial orientation
             JVector fwd = JVector.Normalize(vel);
             JVector up = JVector.UnitY;
-            JVector right = JVector.Cross(fwd, up);
-            JMatrix ori = new JMatrix(right.X, up.X, fwd.X, right.Y, up.Y, fwd.Y, right.Z, up.Z, fwd.Z);
+            JVector right = JVector.Normalize(JVector.Cross(up, fwd));
+            up = JVector.Cross(fwd, right);
+            JMatrix ori = JMatrix.FromColumns(right, up, fwd);
             body.Orientation = JQuaternion.CreateFromMatrix(ori);
 
             planks.Add(new BeltPlank { Body = body, DistanceOffset = dist });

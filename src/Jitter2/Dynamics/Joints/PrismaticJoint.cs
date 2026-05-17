@@ -35,6 +35,11 @@ public class PrismaticJoint : Joint
         Body1 = body1;
         Body2 = body2;
 
+        ArgumentCheck.Finite(center, nameof(center));
+        ArgumentCheck.NonZero(axis, nameof(axis));
+        ArgumentCheck.NotNaN(limit.From, nameof(limit.From));
+        ArgumentCheck.NotNaN(limit.To, nameof(limit.To));
+
         JVector.NormalizeInPlace(ref axis);
 
         Slider = world.CreateConstraint<PointOnLine>(body1, body2);

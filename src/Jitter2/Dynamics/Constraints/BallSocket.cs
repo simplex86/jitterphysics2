@@ -65,6 +65,8 @@ public unsafe class BallSocket : Constraint<BallSocket.BallSocketData>
     public void Initialize(JVector anchor)
     {
         VerifyNotZero();
+        ArgumentCheck.Finite(anchor, nameof(anchor));
+
         ref BallSocketData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
         ref RigidBodyData body2 = ref data.Body2.Data;
@@ -88,6 +90,8 @@ public unsafe class BallSocket : Constraint<BallSocket.BallSocketData>
     {
         set
         {
+            DebugCheck.IsFinite(value, nameof(value));
+
             ref BallSocketData data = ref Data;
             ref RigidBodyData body1 = ref data.Body1.Data;
             JVector.Subtract(value, body1.Position, out data.LocalAnchor1);
@@ -112,6 +116,8 @@ public unsafe class BallSocket : Constraint<BallSocket.BallSocketData>
     {
         set
         {
+            DebugCheck.IsFinite(value, nameof(value));
+
             ref BallSocketData data = ref Data;
             ref RigidBodyData body2 = ref data.Body2.Data;
             JVector.Subtract(value, body2.Position, out data.LocalAnchor2);
@@ -176,19 +182,27 @@ public unsafe class BallSocket : Constraint<BallSocket.BallSocketData>
     public Real Softness
     {
         get => Data.Softness;
-        set => Data.Softness = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.Softness = value;
+        }
     }
 
     /// <summary>
     /// Gets or sets the bias factor controlling how aggressively positional error is corrected.
     /// </summary>
     /// <value>
-    /// Default is 0.2. Range [0, 1]. Higher values correct errors faster but may cause instability.
+    /// Default is 0.2. Higher values correct errors faster but may cause instability.
     /// </value>
     public Real Bias
     {
         get => Data.BiasFactor;
-        set => Data.BiasFactor = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.BiasFactor = value;
+        }
     }
 
     /// <summary>

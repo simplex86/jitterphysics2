@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-using System;
 using Jitter2.LinearMath;
 
 namespace Jitter2.Collision;
@@ -41,7 +40,7 @@ public static class SupportPrimitives
     /// </summary>
     public readonly struct Sphere(Real radius) : ISupportMappable
     {
-        private readonly Real radius = radius > (Real)0.0 ? radius : throw new ArgumentOutOfRangeException(nameof(radius));
+        private readonly Real radius = ArgumentCheck.Positive(radius, nameof(radius));
 
         public readonly void SupportMap(in JVector direction, out JVector result) => result = JVector.Normalize(direction) * radius;
 
@@ -53,11 +52,7 @@ public static class SupportPrimitives
     /// </summary>
     public readonly struct Box(JVector halfExtents) : ISupportMappable
     {
-        private readonly JVector halfExtents = halfExtents.X > (Real)0.0 &&
-                                               halfExtents.Y > (Real)0.0 &&
-                                               halfExtents.Z > (Real)0.0
-            ? halfExtents
-            : throw new ArgumentOutOfRangeException(nameof(halfExtents));
+        private readonly JVector halfExtents = ArgumentCheck.PositiveComponents(halfExtents, nameof(halfExtents));
 
         public readonly void SupportMap(in JVector direction, out JVector result)
         {
@@ -74,8 +69,8 @@ public static class SupportPrimitives
     /// </summary>
     public readonly struct Capsule(Real radius, Real halfLength) : ISupportMappable
     {
-        private readonly Real radius = radius > (Real)0.0 ? radius : throw new ArgumentOutOfRangeException(nameof(radius));
-        private readonly Real halfLength = halfLength >= (Real)0.0 ? halfLength : throw new ArgumentOutOfRangeException(nameof(halfLength));
+        private readonly Real radius = ArgumentCheck.Positive(radius, nameof(radius));
+        private readonly Real halfLength = ArgumentCheck.NonNegative(halfLength, nameof(halfLength));
 
         public readonly void SupportMap(in JVector direction, out JVector result)
         {
@@ -91,8 +86,8 @@ public static class SupportPrimitives
     /// </summary>
     public readonly struct Cylinder(Real radius, Real halfHeight) : ISupportMappable
     {
-        private readonly Real radius = radius > (Real)0.0 ? radius : throw new ArgumentOutOfRangeException(nameof(radius));
-        private readonly Real halfHeight = halfHeight > (Real)0.0 ? halfHeight : throw new ArgumentOutOfRangeException(nameof(halfHeight));
+        private readonly Real radius = ArgumentCheck.Positive(radius, nameof(radius));
+        private readonly Real halfHeight = ArgumentCheck.Positive(halfHeight, nameof(halfHeight));
 
         public readonly void SupportMap(in JVector direction, out JVector result)
         {
@@ -121,8 +116,8 @@ public static class SupportPrimitives
     /// </summary>
     public readonly struct Cone(Real radius, Real height) : ISupportMappable
     {
-        private readonly Real radius = radius > (Real)0.0 ? radius : throw new ArgumentOutOfRangeException(nameof(radius));
-        private readonly Real height = height > (Real)0.0 ? height : throw new ArgumentOutOfRangeException(nameof(height));
+        private readonly Real radius = ArgumentCheck.Positive(radius, nameof(radius));
+        private readonly Real height = ArgumentCheck.Positive(height, nameof(height));
 
         public readonly void SupportMap(in JVector direction, out JVector result)
         {

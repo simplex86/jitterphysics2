@@ -332,10 +332,19 @@ public sealed partial class World : IDisposable
     /// Default gravity, see also <see cref="RigidBody.AffectedByGravity"/>.
     /// Default value: (0, -9.81, 0).
     /// </summary>
-    public JVector Gravity { get; set; } = new(0, -(Real)9.81, 0);
+    public JVector Gravity
+    {
+        get => gravity;
+        set
+        {
+            DebugCheck.IsFinite(value, nameof(value));
+            gravity = value;
+        }
+    }
 
     // Make this global since it is used by nearly every method called
     // in World.Step.
+    private JVector gravity = new(0, -(Real)9.81, 0);
     private int solverIterations = 6;
     private int velocityRelaxations = 4;
     private int substeps = 1;

@@ -69,6 +69,11 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     public void Initialize(JVector axis1, JVector axis2, AngularLimit limit)
     {
         VerifyNotZero();
+        ArgumentCheck.NonZero(axis1, nameof(axis1));
+        ArgumentCheck.NonZero(axis2, nameof(axis2));
+        ArgumentCheck.Finite(limit.From, nameof(limit.From));
+        ArgumentCheck.Finite(limit.To, nameof(limit.To));
+
         ref TwistLimitData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
         ref RigidBodyData body2 = ref data.Body2.Data;
@@ -110,6 +115,9 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     {
         set
         {
+            ArgumentCheck.Finite(value.From, nameof(value.From));
+            ArgumentCheck.Finite(value.To, nameof(value.To));
+
             ref TwistLimitData data = ref Data;
             data.Angle1 = StableMath.Sin((Real)value.From / (Real)2.0);
             data.Angle2 = StableMath.Sin((Real)value.To / (Real)2.0);
@@ -212,19 +220,27 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     public Real Softness
     {
         get => Data.Softness;
-        set => Data.Softness = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.Softness = value;
+        }
     }
 
     /// <summary>
     /// Gets or sets the bias factor controlling how aggressively angular error is corrected.
     /// </summary>
     /// <value>
-    /// Default is 0.2. Range [0, 1]. Higher values correct errors faster but may cause instability.
+    /// Default is 0.2. Higher values correct errors faster but may cause instability.
     /// </value>
     public Real Bias
     {
         get => Data.BiasFactor;
-        set => Data.BiasFactor = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.BiasFactor = value;
+        }
     }
 
     /// <summary>

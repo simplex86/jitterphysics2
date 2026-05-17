@@ -26,6 +26,10 @@ public class UniversalJoint : Joint
         Body1 = body1;
         Body2 = body2;
 
+        ArgumentCheck.Finite(center, nameof(center));
+        ArgumentCheck.NonZero(rotateAxis1, nameof(rotateAxis1));
+        ArgumentCheck.NonZero(rotateAxis2, nameof(rotateAxis2));
+
         JVector.NormalizeInPlace(ref rotateAxis1);
         JVector.NormalizeInPlace(ref rotateAxis2);
 

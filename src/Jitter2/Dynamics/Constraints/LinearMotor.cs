@@ -58,7 +58,10 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     public JVector LocalAxis1
     {
         get => Data.LocalAxis1;
-        set => Data.LocalAxis1 = value;
+        set
+        {
+            Data.LocalAxis1 = ArgumentCheck.UnitVector(value, nameof(value));
+        }
     }
 
     /// <summary>
@@ -67,7 +70,10 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     public JVector LocalAxis2
     {
         get => Data.LocalAxis2;
-        set => Data.LocalAxis2 = value;
+        set
+        {
+            Data.LocalAxis2 = ArgumentCheck.UnitVector(value, nameof(value));
+        }
     }
 
     /// <summary>
@@ -82,6 +88,9 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     public void Initialize(JVector axis1, JVector axis2)
     {
         VerifyNotZero();
+        ArgumentCheck.NonZero(axis1, nameof(axis1));
+        ArgumentCheck.NonZero(axis2, nameof(axis2));
+
         ref LinearMotorData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
         ref RigidBodyData body2 = ref data.Body2.Data;
@@ -103,7 +112,11 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     public Real TargetVelocity
     {
         get => Data.Velocity;
-        set => Data.Velocity = value;
+        set
+        {
+            DebugCheck.IsFinite(value, nameof(value));
+            Data.Velocity = value;
+        }
     }
 
     /// <summary>
@@ -118,8 +131,7 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
         get => Data.MaxForce;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value);
-            Data.MaxForce = value;
+            Data.MaxForce = ArgumentCheck.NonNegative(value, nameof(value));
         }
     }
 

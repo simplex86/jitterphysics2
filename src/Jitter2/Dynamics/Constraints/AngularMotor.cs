@@ -64,6 +64,9 @@ public unsafe class AngularMotor : Constraint<AngularMotor.AngularMotorData>
     public void Initialize(JVector axis1, JVector axis2)
     {
         VerifyNotZero();
+        ArgumentCheck.NonZero(axis1, nameof(axis1));
+        ArgumentCheck.NonZero(axis2, nameof(axis2));
+
         ref AngularMotorData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
         ref RigidBodyData body2 = ref data.Body2.Data;
@@ -94,7 +97,11 @@ public unsafe class AngularMotor : Constraint<AngularMotor.AngularMotorData>
     public Real TargetVelocity
     {
         get => Data.Velocity;
-        set => Data.Velocity = value;
+        set
+        {
+            DebugCheck.IsFinite(value, nameof(value));
+            Data.Velocity = value;
+        }
     }
 
     /// <summary>
@@ -119,8 +126,7 @@ public unsafe class AngularMotor : Constraint<AngularMotor.AngularMotorData>
         get => Data.MaxForce;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value);
-            Data.MaxForce = value;
+            Data.MaxForce = ArgumentCheck.NonNegative(value, nameof(value));
         }
     }
 

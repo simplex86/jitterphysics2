@@ -73,6 +73,10 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     public void Initialize(JVector axis, AngularLimit limit)
     {
         VerifyNotZero();
+        ArgumentCheck.NonZero(axis, nameof(axis));
+        ArgumentCheck.Finite(limit.From, nameof(limit.From));
+        ArgumentCheck.Finite(limit.To, nameof(limit.To));
+
         ref HingeAngleData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
         ref RigidBodyData body2 = ref data.Body2.Data;
@@ -85,6 +89,7 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
         data.MinAngle = StableMath.Sin((Real)limit.From / (Real)2.0);
         data.MaxAngle = StableMath.Sin((Real)limit.To / (Real)2.0);
 
+        JVector.NormalizeInPlace(ref axis);
         data.Axis = JVector.ConjugatedTransform(axis, body2.Orientation);
 
         JQuaternion q1 = body1.Orientation;
@@ -100,6 +105,9 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     {
         set
         {
+            ArgumentCheck.Finite(value.From, nameof(value.From));
+            ArgumentCheck.Finite(value.To, nameof(value.To));
+
             ref HingeAngleData data = ref Data;
             data.MinAngle = StableMath.Sin((Real)value.From / (Real)2.0);
             data.MaxAngle = StableMath.Sin((Real)value.To / (Real)2.0);
@@ -214,7 +222,11 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     public Real Softness
     {
         get => Data.Softness;
-        set => Data.Softness = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.Softness = value;
+        }
     }
 
     /// <summary>
@@ -226,31 +238,43 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     public Real LimitSoftness
     {
         get => Data.LimitSoftness;
-        set => Data.LimitSoftness = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.LimitSoftness = value;
+        }
     }
 
     /// <summary>
     /// Gets or sets the bias factor controlling how aggressively angular error is corrected.
     /// </summary>
     /// <value>
-    /// Default is 0.2. Range [0, 1]. Higher values correct errors faster but may cause instability.
+    /// Default is 0.2. Higher values correct errors faster but may cause instability.
     /// </value>
     public Real Bias
     {
         get => Data.BiasFactor;
-        set => Data.BiasFactor = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.BiasFactor = value;
+        }
     }
 
     /// <summary>
     /// Gets or sets the bias factor for angular limit correction.
     /// </summary>
     /// <value>
-    /// Default is 0.1. Range [0, 1]. Higher values correct limit violations faster.
+    /// Default is 0.1. Higher values correct limit violations faster.
     /// </value>
     public Real LimitBias
     {
         get => Data.LimitBias;
-        set => Data.LimitBias = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.LimitBias = value;
+        }
     }
 
     /// <summary>
