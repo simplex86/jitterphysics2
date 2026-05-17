@@ -20,7 +20,7 @@ The active precision mode can be checked at runtime via `Precision.IsDoublePreci
 
 ## Build Configuration and Validation
 
-Object creation and configuration still validate values that would leave the engine in an invalid state, such as shape dimensions, masses, constraint axes, and invalid limits. These checks throw normal .NET exceptions in Debug and Release builds.
+Object creation and configuration validate values that would leave the engine in an invalid state, such as shape dimensions, masses, constraint axes, and invalid limits. These checks throw normal .NET exceptions in Debug and Release builds.
 
 Debug builds add extra sanity checks on runtime state mutation paths, such as non-finite positions, velocities, forces, and non-normalized orientations. These checks are compiled behind the `DEBUG` symbol and are stripped from Release builds.
 
