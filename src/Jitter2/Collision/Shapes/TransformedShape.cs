@@ -32,12 +32,10 @@ public class TransformedShape : RigidBodyShape
     public TransformedShape(RigidBodyShape shape, in JVector translation, in JMatrix transform)
     {
         ArgumentNullException.ThrowIfNull(shape);
-        ArgumentCheck.IsFinite(translation, nameof(translation));
-        ArgumentCheck.IsFinite(transform, nameof(transform));
 
         OriginalShape = shape;
-        this.translation = translation;
-        this.transformation = transform;
+        this.translation = ArgumentCheck.Finite(translation, nameof(translation));
+        this.transformation = ArgumentCheck.Finite(transform, nameof(transform));
 
         AnalyzeTransformation();
         UpdateWorldBoundingBox();

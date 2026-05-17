@@ -25,11 +25,7 @@ public class BoxShape : RigidBodyShape
     /// </exception>
     public BoxShape(JVector size)
     {
-        ArgumentCheck.IsPositive(size.X, nameof(size));
-        ArgumentCheck.IsPositive(size.Y, nameof(size));
-        ArgumentCheck.IsPositive(size.Z, nameof(size));
-
-        halfSize = (Real)0.5 * size;
+        halfSize = (Real)0.5 * ArgumentCheck.PositiveComponents(size, nameof(size));
         UpdateWorldBoundingBox();
     }
 
@@ -44,11 +40,7 @@ public class BoxShape : RigidBodyShape
         get => (Real)2.0 * halfSize;
         set
         {
-            ArgumentCheck.IsPositive(value.X, nameof(Size));
-            ArgumentCheck.IsPositive(value.Y, nameof(Size));
-            ArgumentCheck.IsPositive(value.Z, nameof(Size));
-
-            halfSize = value * (Real)0.5;
+            halfSize = ArgumentCheck.PositiveComponents(value, nameof(Size)) * (Real)0.5;
             UpdateWorldBoundingBox();
         }
     }
@@ -62,9 +54,7 @@ public class BoxShape : RigidBodyShape
     /// </exception>
     public BoxShape(Real size)
     {
-        ArgumentCheck.IsPositive(size, nameof(size));
-
-        halfSize = new JVector(size * (Real)0.5);
+        halfSize = new JVector(ArgumentCheck.Positive(size, nameof(size)) * (Real)0.5);
         UpdateWorldBoundingBox();
     }
 
@@ -80,11 +70,10 @@ public class BoxShape : RigidBodyShape
     /// </exception>
     public BoxShape(Real width, Real height, Real length)
     {
-        ArgumentCheck.IsPositive(length, nameof(length));
-        ArgumentCheck.IsPositive(height, nameof(height));
-        ArgumentCheck.IsPositive(width, nameof(width));
-
-        halfSize = (Real)0.5 * new JVector(width, height, length);
+        halfSize = (Real)0.5 * new JVector(
+            ArgumentCheck.Positive(width, nameof(width)),
+            ArgumentCheck.Positive(height, nameof(height)),
+            ArgumentCheck.Positive(length, nameof(length)));
         UpdateWorldBoundingBox();
     }
 

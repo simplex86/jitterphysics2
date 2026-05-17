@@ -20,41 +20,41 @@ namespace Jitter2;
 internal static class DebugCheck
 {
     [Conditional("DEBUG")]
-    public static void IsFinite(Real value, string paramName) => ArgumentCheck.IsFinite(value, paramName);
+    public static void IsFinite(Real value, string paramName) => ArgumentCheck.Finite(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsFinite(JAngle value, string paramName) => ArgumentCheck.IsFinite(value, paramName);
+    public static void IsFinite(JAngle value, string paramName) => ArgumentCheck.Finite(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsNotNaN(Real value, string paramName) => ArgumentCheck.IsNotNaN(value, paramName);
+    public static void IsNotNaN(Real value, string paramName) => ArgumentCheck.NotNaN(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsNotNaN(JAngle value, string paramName) => ArgumentCheck.IsNotNaN(value, paramName);
+    public static void IsNotNaN(JAngle value, string paramName) => ArgumentCheck.NotNaN(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsFinite(in JVector value, string paramName) => ArgumentCheck.IsFinite(value, paramName);
+    public static void IsFinite(in JVector value, string paramName) => ArgumentCheck.Finite(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsFinite(in JQuaternion value, string paramName) => ArgumentCheck.IsFinite(value, paramName);
+    public static void IsFinite(in JQuaternion value, string paramName) => ArgumentCheck.Finite(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsFinite(in JMatrix value, string paramName) => ArgumentCheck.IsFinite(value, paramName);
+    public static void IsFinite(in JMatrix value, string paramName) => ArgumentCheck.Finite(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsNonNegative(Real value, string paramName) => ArgumentCheck.IsNonNegative(value, paramName);
+    public static void IsNonNegative(Real value, string paramName) => ArgumentCheck.NonNegative(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsPositive(Real value, string paramName) => ArgumentCheck.IsPositive(value, paramName);
+    public static void IsPositive(Real value, string paramName) => ArgumentCheck.Positive(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsInRange(Real value, Real min, Real max, string paramName) => ArgumentCheck.IsInRange(value, min, max, paramName);
+    public static void IsInRange(Real value, Real min, Real max, string paramName) => ArgumentCheck.InRange(value, min, max, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsNonZero(in JVector value, string paramName) => ArgumentCheck.IsNonZero(value, paramName);
+    public static void IsNonZero(in JVector value, string paramName) => ArgumentCheck.NonZero(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsUnitVector(in JVector value, string paramName) => ArgumentCheck.IsUnitVector(value, paramName);
+    public static void IsUnitVector(in JVector value, string paramName) => ArgumentCheck.UnitVector(value, paramName);
 
     [Conditional("DEBUG")]
-    public static void IsUnitQuaternion(in JQuaternion value, string paramName) => ArgumentCheck.IsUnitQuaternion(value, paramName);
+    public static void IsUnitQuaternion(in JQuaternion value, string paramName) => ArgumentCheck.UnitQuaternion(value, paramName);
 }

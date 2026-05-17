@@ -22,89 +22,117 @@ internal static class ArgumentCheck
     private const Real NonZeroLengthSquared = (Real)1e-12;
     private const Real UnitLengthSquaredTolerance = (Real)1e-3;
 
-    public static void IsFinite(Real value, string paramName)
+    public static Real Finite(Real value, string paramName)
     {
         if (!IsFiniteCore(value))
         {
             throw new ArgumentException("Value must be finite.", paramName);
         }
+
+        return value;
     }
 
-    public static void IsFinite(JAngle value, string paramName)
+    public static JAngle Finite(JAngle value, string paramName)
     {
-        IsFinite((Real)value, paramName);
+        Finite((Real)value, paramName);
+        return value;
     }
 
-    public static void IsNotNaN(Real value, string paramName)
+    public static Real NotNaN(Real value, string paramName)
     {
         if (Real.IsNaN(value))
         {
             throw new ArgumentException("Value must not be NaN.", paramName);
         }
+
+        return value;
     }
 
-    public static void IsNotNaN(JAngle value, string paramName)
+    public static JAngle NotNaN(JAngle value, string paramName)
     {
-        IsNotNaN((Real)value, paramName);
+        NotNaN((Real)value, paramName);
+        return value;
     }
 
-    public static void IsFinite(in JVector value, string paramName)
+    public static JVector Finite(in JVector value, string paramName)
     {
         if (!IsFiniteCore(value))
         {
             throw new ArgumentException("Vector components must be finite.", paramName);
         }
+
+        return value;
     }
 
-    public static void IsFinite(in JQuaternion value, string paramName)
+    public static JQuaternion Finite(in JQuaternion value, string paramName)
     {
         if (!IsFiniteCore(value))
         {
             throw new ArgumentException("Quaternion components must be finite.", paramName);
         }
+
+        return value;
     }
 
-    public static void IsFinite(in JMatrix value, string paramName)
+    public static JMatrix Finite(in JMatrix value, string paramName)
     {
         if (!IsFiniteCore(value))
         {
             throw new ArgumentException("Matrix components must be finite.", paramName);
         }
+
+        return value;
     }
 
-    public static void IsNonNegative(Real value, string paramName)
+    public static Real NonNegative(Real value, string paramName)
     {
         if (!IsFiniteCore(value) || value < (Real)0.0)
         {
             throw new ArgumentOutOfRangeException(paramName, value, "Value must be finite and non-negative.");
         }
+
+        return value;
     }
 
-    public static void IsPositive(Real value, string paramName)
+    public static Real Positive(Real value, string paramName)
     {
         if (!IsFiniteCore(value) || value <= (Real)0.0)
         {
             throw new ArgumentOutOfRangeException(paramName, value, "Value must be finite and positive.");
         }
+
+        return value;
     }
 
-    public static void IsInRange(Real value, Real min, Real max, string paramName)
+    public static Real InRange(Real value, Real min, Real max, string paramName)
     {
         if (!IsFiniteCore(value) || value < min || value > max)
         {
             throw new ArgumentOutOfRangeException(paramName, value, $"Value must be finite and in the range [{min}, {max}].");
         }
+
+        return value;
     }
 
-    public static void IsNonZero(in JVector value, string paramName)
+    public static JVector NonZero(in JVector value, string paramName)
     {
         if (!IsFiniteCore(value) || value.LengthSquared() <= NonZeroLengthSquared)
         {
             throw new ArgumentException("Vector must be finite and non-zero.", paramName);
         }
+
+        return value;
     }
 
-    public static void IsUnitVector(in JVector value, string paramName)
+    public static JVector PositiveComponents(in JVector value, string paramName)
+    {
+        Positive(value.X, paramName);
+        Positive(value.Y, paramName);
+        Positive(value.Z, paramName);
+        return value;
+    }
+
+    public static JVector UnitVector(in JVector value, string paramName)
     {
         Real lengthSquared = value.LengthSquared();
 
@@ -112,9 +140,11 @@ internal static class ArgumentCheck
         {
             throw new ArgumentException("Vector must be finite and normalized.", paramName);
         }
+
+        return value;
     }
 
-    public static void IsUnitQuaternion(in JQuaternion value, string paramName)
+    public static JQuaternion UnitQuaternion(in JQuaternion value, string paramName)
     {
         Real lengthSquared = value.LengthSquared();
 
@@ -122,6 +152,8 @@ internal static class ArgumentCheck
         {
             throw new ArgumentException("Quaternion must be finite and normalized.", paramName);
         }
+
+        return value;
     }
 
     private static bool IsFiniteCore(Real value) => Real.IsFinite(value);

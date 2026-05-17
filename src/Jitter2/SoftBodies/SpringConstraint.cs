@@ -80,8 +80,8 @@ public unsafe class SpringConstraint : Constraint<SpringConstraint.SpringData>
     public void Initialize(JVector anchor1, JVector anchor2)
     {
         VerifyNotZero();
-        ArgumentCheck.IsFinite(anchor1, nameof(anchor1));
-        ArgumentCheck.IsFinite(anchor2, nameof(anchor2));
+        ArgumentCheck.Finite(anchor1, nameof(anchor1));
+        ArgumentCheck.Finite(anchor2, nameof(anchor2));
 
         ref SpringData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -105,9 +105,9 @@ public unsafe class SpringConstraint : Constraint<SpringConstraint.SpringData>
     /// <param name="dt">The timestep of the simulation.</param>
     public void SetSpringParameters(Real frequency, Real damping, Real dt)
     {
-        ArgumentCheck.IsPositive(frequency, nameof(frequency));
-        ArgumentCheck.IsNonNegative(damping, nameof(damping));
-        ArgumentCheck.IsPositive(dt, nameof(dt));
+        ArgumentCheck.Positive(frequency, nameof(frequency));
+        ArgumentCheck.NonNegative(damping, nameof(damping));
+        ArgumentCheck.Positive(dt, nameof(dt));
 
         ref SpringData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;

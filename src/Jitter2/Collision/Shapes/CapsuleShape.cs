@@ -28,8 +28,7 @@ public class CapsuleShape : RigidBodyShape
         get => radius;
         set
         {
-            ArgumentCheck.IsPositive(value, nameof(Radius));
-            radius = value;
+            radius = ArgumentCheck.Positive(value, nameof(Radius));
             UpdateWorldBoundingBox();
         }
     }
@@ -45,8 +44,7 @@ public class CapsuleShape : RigidBodyShape
         get => (Real)2.0 * halfLength;
         set
         {
-            ArgumentCheck.IsNonNegative(value, nameof(Length));
-            halfLength = value / (Real)2.0;
+            halfLength = ArgumentCheck.NonNegative(value, nameof(Length)) / (Real)2.0;
             UpdateWorldBoundingBox();
         }
     }
@@ -61,11 +59,8 @@ public class CapsuleShape : RigidBodyShape
     /// </exception>
     public CapsuleShape(Real radius = (Real)0.5, Real length = (Real)1.0)
     {
-        ArgumentCheck.IsPositive(radius, nameof(radius));
-        ArgumentCheck.IsNonNegative(length, nameof(length));
-
-        this.radius = radius;
-        halfLength = (Real)0.5 * length;
+        this.radius = ArgumentCheck.Positive(radius, nameof(radius));
+        halfLength = (Real)0.5 * ArgumentCheck.NonNegative(length, nameof(length));
         UpdateWorldBoundingBox();
     }
 

@@ -60,8 +60,7 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
         get => Data.LocalAxis1;
         set
         {
-            ArgumentCheck.IsUnitVector(value, nameof(value));
-            Data.LocalAxis1 = value;
+            Data.LocalAxis1 = ArgumentCheck.UnitVector(value, nameof(value));
         }
     }
 
@@ -73,8 +72,7 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
         get => Data.LocalAxis2;
         set
         {
-            ArgumentCheck.IsUnitVector(value, nameof(value));
-            Data.LocalAxis2 = value;
+            Data.LocalAxis2 = ArgumentCheck.UnitVector(value, nameof(value));
         }
     }
 
@@ -90,8 +88,8 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     public void Initialize(JVector axis1, JVector axis2)
     {
         VerifyNotZero();
-        ArgumentCheck.IsNonZero(axis1, nameof(axis1));
-        ArgumentCheck.IsNonZero(axis2, nameof(axis2));
+        ArgumentCheck.NonZero(axis1, nameof(axis1));
+        ArgumentCheck.NonZero(axis2, nameof(axis2));
 
         ref LinearMotorData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -133,8 +131,7 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
         get => Data.MaxForce;
         set
         {
-            ArgumentCheck.IsNonNegative(value, nameof(value));
-            Data.MaxForce = value;
+            Data.MaxForce = ArgumentCheck.NonNegative(value, nameof(value));
         }
     }
 

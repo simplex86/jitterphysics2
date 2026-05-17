@@ -81,11 +81,11 @@ public unsafe class PointOnPlane : Constraint<PointOnPlane.SliderData>
     public void Initialize(JVector axis, JVector anchor1, JVector anchor2, LinearLimit limit)
     {
         VerifyNotZero();
-        ArgumentCheck.IsNonZero(axis, nameof(axis));
-        ArgumentCheck.IsFinite(anchor1, nameof(anchor1));
-        ArgumentCheck.IsFinite(anchor2, nameof(anchor2));
-        ArgumentCheck.IsNotNaN(limit.From, nameof(limit.From));
-        ArgumentCheck.IsNotNaN(limit.To, nameof(limit.To));
+        ArgumentCheck.NonZero(axis, nameof(axis));
+        ArgumentCheck.Finite(anchor1, nameof(anchor1));
+        ArgumentCheck.Finite(anchor2, nameof(anchor2));
+        ArgumentCheck.NotNaN(limit.From, nameof(limit.From));
+        ArgumentCheck.NotNaN(limit.To, nameof(limit.To));
 
         ref SliderData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;

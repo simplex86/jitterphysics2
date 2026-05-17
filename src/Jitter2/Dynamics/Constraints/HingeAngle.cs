@@ -73,9 +73,9 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     public void Initialize(JVector axis, AngularLimit limit)
     {
         VerifyNotZero();
-        ArgumentCheck.IsNonZero(axis, nameof(axis));
-        ArgumentCheck.IsFinite(limit.From, nameof(limit.From));
-        ArgumentCheck.IsFinite(limit.To, nameof(limit.To));
+        ArgumentCheck.NonZero(axis, nameof(axis));
+        ArgumentCheck.Finite(limit.From, nameof(limit.From));
+        ArgumentCheck.Finite(limit.To, nameof(limit.To));
 
         ref HingeAngleData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -105,8 +105,8 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     {
         set
         {
-            ArgumentCheck.IsFinite(value.From, nameof(value.From));
-            ArgumentCheck.IsFinite(value.To, nameof(value.To));
+            ArgumentCheck.Finite(value.From, nameof(value.From));
+            ArgumentCheck.Finite(value.To, nameof(value.To));
 
             ref HingeAngleData data = ref Data;
             data.MinAngle = StableMath.Sin((Real)value.From / (Real)2.0);

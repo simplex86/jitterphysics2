@@ -27,8 +27,7 @@ public class SphereShape : RigidBodyShape
         get => radius;
         set
         {
-            ArgumentCheck.IsPositive(value, nameof(Radius));
-            radius = value;
+            radius = ArgumentCheck.Positive(value, nameof(Radius));
             UpdateWorldBoundingBox();
         }
     }
@@ -42,9 +41,7 @@ public class SphereShape : RigidBodyShape
     /// </exception>
     public SphereShape(Real radius = (Real)1.0)
     {
-        ArgumentCheck.IsPositive(radius, nameof(radius));
-
-        this.radius = radius;
+        this.radius = ArgumentCheck.Positive(radius, nameof(radius));
         UpdateWorldBoundingBox();
     }
 

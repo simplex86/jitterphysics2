@@ -84,10 +84,10 @@ public unsafe class DistanceLimit : Constraint<DistanceLimit.DistanceLimitData>
     public void Initialize(JVector anchor1, JVector anchor2, LinearLimit limit)
     {
         VerifyNotZero();
-        ArgumentCheck.IsFinite(anchor1, nameof(anchor1));
-        ArgumentCheck.IsFinite(anchor2, nameof(anchor2));
-        ArgumentCheck.IsNotNaN(limit.From, nameof(limit.From));
-        ArgumentCheck.IsNotNaN(limit.To, nameof(limit.To));
+        ArgumentCheck.Finite(anchor1, nameof(anchor1));
+        ArgumentCheck.Finite(anchor2, nameof(anchor2));
+        ArgumentCheck.NotNaN(limit.From, nameof(limit.From));
+        ArgumentCheck.NotNaN(limit.To, nameof(limit.To));
 
         ref DistanceLimitData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;

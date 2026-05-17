@@ -69,10 +69,10 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     public void Initialize(JVector axis1, JVector axis2, AngularLimit limit)
     {
         VerifyNotZero();
-        ArgumentCheck.IsNonZero(axis1, nameof(axis1));
-        ArgumentCheck.IsNonZero(axis2, nameof(axis2));
-        ArgumentCheck.IsFinite(limit.From, nameof(limit.From));
-        ArgumentCheck.IsFinite(limit.To, nameof(limit.To));
+        ArgumentCheck.NonZero(axis1, nameof(axis1));
+        ArgumentCheck.NonZero(axis2, nameof(axis2));
+        ArgumentCheck.Finite(limit.From, nameof(limit.From));
+        ArgumentCheck.Finite(limit.To, nameof(limit.To));
 
         ref TwistLimitData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -115,8 +115,8 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     {
         set
         {
-            ArgumentCheck.IsFinite(value.From, nameof(value.From));
-            ArgumentCheck.IsFinite(value.To, nameof(value.To));
+            ArgumentCheck.Finite(value.From, nameof(value.From));
+            ArgumentCheck.Finite(value.To, nameof(value.To));
 
             ref TwistLimitData data = ref Data;
             data.Angle1 = StableMath.Sin((Real)value.From / (Real)2.0);

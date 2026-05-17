@@ -27,8 +27,8 @@ public class HingeJoint : Joint
         Body1 = body1;
         Body2 = body2;
 
-        ArgumentCheck.IsFinite(hingeCenter, nameof(hingeCenter));
-        ArgumentCheck.IsNonZero(hingeAxis, nameof(hingeAxis));
+        ArgumentCheck.Finite(hingeCenter, nameof(hingeCenter));
+        ArgumentCheck.NonZero(hingeAxis, nameof(hingeAxis));
 
         JVector.NormalizeInPlace(ref hingeAxis);
 

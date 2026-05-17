@@ -64,8 +64,8 @@ public unsafe class AngularMotor : Constraint<AngularMotor.AngularMotorData>
     public void Initialize(JVector axis1, JVector axis2)
     {
         VerifyNotZero();
-        ArgumentCheck.IsNonZero(axis1, nameof(axis1));
-        ArgumentCheck.IsNonZero(axis2, nameof(axis2));
+        ArgumentCheck.NonZero(axis1, nameof(axis1));
+        ArgumentCheck.NonZero(axis2, nameof(axis2));
 
         ref AngularMotorData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -126,8 +126,7 @@ public unsafe class AngularMotor : Constraint<AngularMotor.AngularMotorData>
         get => Data.MaxForce;
         set
         {
-            ArgumentCheck.IsNonNegative(value, nameof(value));
-            Data.MaxForce = value;
+            Data.MaxForce = ArgumentCheck.NonNegative(value, nameof(value));
         }
     }
 

@@ -35,10 +35,10 @@ public class PrismaticJoint : Joint
         Body1 = body1;
         Body2 = body2;
 
-        ArgumentCheck.IsFinite(center, nameof(center));
-        ArgumentCheck.IsNonZero(axis, nameof(axis));
-        ArgumentCheck.IsNotNaN(limit.From, nameof(limit.From));
-        ArgumentCheck.IsNotNaN(limit.To, nameof(limit.To));
+        ArgumentCheck.Finite(center, nameof(center));
+        ArgumentCheck.NonZero(axis, nameof(axis));
+        ArgumentCheck.NotNaN(limit.From, nameof(limit.From));
+        ArgumentCheck.NotNaN(limit.To, nameof(limit.To));
 
         JVector.NormalizeInPlace(ref axis);
 

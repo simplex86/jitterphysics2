@@ -348,8 +348,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => friction;
         set
         {
-            ArgumentCheck.IsNonNegative(value, nameof(value));
-            friction = value;
+            friction = ArgumentCheck.NonNegative(value, nameof(value));
         }
     }
 
@@ -368,8 +367,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => restitution;
         set
         {
-            ArgumentCheck.IsInRange(value, (Real)0.0, (Real)1.0, nameof(value));
-            restitution = value;
+            restitution = ArgumentCheck.InRange(value, (Real)0.0, (Real)1.0, nameof(value));
         }
     }
 
@@ -401,8 +399,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => TimeSpan.FromSeconds(deactivationTimeThreshold);
         set
         {
-            ArgumentCheck.IsNonNegative((Real)value.TotalSeconds, nameof(value));
-            deactivationTimeThreshold = (Real)value.TotalSeconds;
+            deactivationTimeThreshold = ArgumentCheck.NonNegative((Real)value.TotalSeconds, nameof(value));
         }
     }
 
@@ -423,8 +420,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => (MathR.Sqrt(inactiveThresholdAngularSq), MathR.Sqrt(inactiveThresholdLinearSq));
         set
         {
-            ArgumentCheck.IsNonNegative(value.linear, nameof(value.linear));
-            ArgumentCheck.IsNonNegative(value.angular, nameof(value.angular));
+            ArgumentCheck.NonNegative(value.linear, nameof(value.linear));
+            ArgumentCheck.NonNegative(value.angular, nameof(value.angular));
 
             inactiveThresholdLinearSq = value.linear * value.linear;
             inactiveThresholdAngularSq = value.angular * value.angular;
@@ -448,8 +445,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => ((Real)1.0 - linearDampingMultiplier, (Real)1.0 - angularDampingMultiplier);
         set
         {
-            ArgumentCheck.IsInRange(value.linear, (Real)0.0, (Real)1.0, nameof(value.linear));
-            ArgumentCheck.IsInRange(value.angular, (Real)0.0, (Real)1.0, nameof(value.angular));
+            ArgumentCheck.InRange(value.linear, (Real)0.0, (Real)1.0, nameof(value.linear));
+            ArgumentCheck.InRange(value.angular, (Real)0.0, (Real)1.0, nameof(value.angular));
 
             linearDampingMultiplier = (Real)1.0 - value.linear;
             angularDampingMultiplier = (Real)1.0 - value.angular;
@@ -1278,7 +1275,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <exception cref="ArgumentException">Thrown if the specified mass is zero or negative.</exception>
     public void SetMassInertia(Real mass)
     {
-        ArgumentCheck.IsFinite(mass, nameof(mass));
+        ArgumentCheck.Finite(mass, nameof(mass));
 
         if (mass <= (Real)0.0)
         {
@@ -1316,8 +1313,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </exception>
     public void SetMassInertia(in JMatrix inertia, Real mass, bool setAsInverse = false)
     {
-        ArgumentCheck.IsFinite(inertia, nameof(inertia));
-        ArgumentCheck.IsFinite(mass, nameof(mass));
+        ArgumentCheck.Finite(inertia, nameof(inertia));
+        ArgumentCheck.Finite(mass, nameof(mass));
 
         if (setAsInverse)
         {

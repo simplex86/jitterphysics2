@@ -71,10 +71,10 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     public void Initialize(JVector axisBody1, JVector axisBody2, AngularLimit limit)
     {
         VerifyNotZero();
-        ArgumentCheck.IsNonZero(axisBody1, nameof(axisBody1));
-        ArgumentCheck.IsNonZero(axisBody2, nameof(axisBody2));
-        ArgumentCheck.IsInRange((Real)limit.From, (Real)0.0, MathR.PI, nameof(limit.From));
-        ArgumentCheck.IsInRange((Real)limit.To, (Real)limit.From, MathR.PI, nameof(limit.To));
+        ArgumentCheck.NonZero(axisBody1, nameof(axisBody1));
+        ArgumentCheck.NonZero(axisBody2, nameof(axisBody2));
+        ArgumentCheck.InRange((Real)limit.From, (Real)0.0, MathR.PI, nameof(limit.From));
+        ArgumentCheck.InRange((Real)limit.To, (Real)limit.From, MathR.PI, nameof(limit.To));
 
         ref ConeLimitData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
@@ -156,7 +156,7 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
         }
         set
         {
-            ArgumentCheck.IsNonZero(value, nameof(value));
+            ArgumentCheck.NonZero(value, nameof(value));
 
             ref ConeLimitData data = ref Data;
             ref RigidBodyData body1 = ref data.Body1.Data;
@@ -183,7 +183,7 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
         }
         set
         {
-            ArgumentCheck.IsNonZero(value, nameof(value));
+            ArgumentCheck.NonZero(value, nameof(value));
 
             ref ConeLimitData data = ref Data;
             ref RigidBodyData body2 = ref data.Body2.Data;
@@ -208,8 +208,8 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
         }
         set
         {
-            ArgumentCheck.IsInRange((Real)value.From, (Real)0.0, MathR.PI, nameof(value.From));
-            ArgumentCheck.IsInRange((Real)value.To, (Real)value.From, MathR.PI, nameof(value.To));
+            ArgumentCheck.InRange((Real)value.From, (Real)0.0, MathR.PI, nameof(value.From));
+            ArgumentCheck.InRange((Real)value.To, (Real)value.From, MathR.PI, nameof(value.To));
 
             ref ConeLimitData data = ref Data;
             data.LimitLow = StableMath.Cos((Real)value.From);
