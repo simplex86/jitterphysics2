@@ -25,9 +25,9 @@ public class BoxShape : RigidBodyShape
     /// </exception>
     public BoxShape(JVector size)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size.X, nameof(size));
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size.Y, nameof(size));
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size.Z, nameof(size));
+        ArgumentCheck.IsPositive(size.X, nameof(size));
+        ArgumentCheck.IsPositive(size.Y, nameof(size));
+        ArgumentCheck.IsPositive(size.Z, nameof(size));
 
         halfSize = (Real)0.5 * size;
         UpdateWorldBoundingBox();
@@ -44,9 +44,9 @@ public class BoxShape : RigidBodyShape
         get => (Real)2.0 * halfSize;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.X, nameof(Size));
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.Y, nameof(Size));
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.Z, nameof(Size));
+            ArgumentCheck.IsPositive(value.X, nameof(Size));
+            ArgumentCheck.IsPositive(value.Y, nameof(Size));
+            ArgumentCheck.IsPositive(value.Z, nameof(Size));
 
             halfSize = value * (Real)0.5;
             UpdateWorldBoundingBox();
@@ -62,7 +62,7 @@ public class BoxShape : RigidBodyShape
     /// </exception>
     public BoxShape(Real size)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
+        ArgumentCheck.IsPositive(size, nameof(size));
 
         halfSize = new JVector(size * (Real)0.5);
         UpdateWorldBoundingBox();
@@ -80,9 +80,9 @@ public class BoxShape : RigidBodyShape
     /// </exception>
     public BoxShape(Real width, Real height, Real length)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentCheck.IsPositive(length, nameof(length));
+        ArgumentCheck.IsPositive(height, nameof(height));
+        ArgumentCheck.IsPositive(width, nameof(width));
 
         halfSize = (Real)0.5 * new JVector(width, height, length);
         UpdateWorldBoundingBox();

@@ -151,6 +151,7 @@ public sealed partial class World
     {
         ThrowIfDisposed();
         AssertNullBody();
+        DebugCheck.IsFinite(dt, nameof(dt));
 
         switch (dt)
         {
@@ -328,6 +329,7 @@ public sealed partial class World
     {
         ThrowIfDisposed();
         AssertNullBody();
+        DebugCheck.IsFinite(dt, nameof(dt));
 
         switch (dt)
         {

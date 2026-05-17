@@ -81,6 +81,12 @@ public unsafe class PointOnPlane : Constraint<PointOnPlane.SliderData>
     public void Initialize(JVector axis, JVector anchor1, JVector anchor2, LinearLimit limit)
     {
         VerifyNotZero();
+        ArgumentCheck.IsNonZero(axis, nameof(axis));
+        ArgumentCheck.IsFinite(anchor1, nameof(anchor1));
+        ArgumentCheck.IsFinite(anchor2, nameof(anchor2));
+        ArgumentCheck.IsNotNaN(limit.From, nameof(limit.From));
+        ArgumentCheck.IsNotNaN(limit.To, nameof(limit.To));
+
         ref SliderData data = ref Data;
         ref RigidBodyData body1 = ref data.Body1.Data;
         ref RigidBodyData body2 = ref data.Body2.Data;
@@ -173,19 +179,27 @@ public unsafe class PointOnPlane : Constraint<PointOnPlane.SliderData>
     public Real Softness
     {
         get => Data.Softness;
-        set => Data.Softness = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.Softness = value;
+        }
     }
 
     /// <summary>
     /// Gets or sets the bias factor controlling how aggressively positional error is corrected.
     /// </summary>
     /// <value>
-    /// Default is 0.01. Range [0, 1]. Higher values correct errors faster but may cause instability.
+    /// Default is 0.01. Higher values correct errors faster but may cause instability.
     /// </value>
     public Real Bias
     {
         get => Data.BiasFactor;
-        set => Data.BiasFactor = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.BiasFactor = value;
+        }
     }
 
     /// <summary>

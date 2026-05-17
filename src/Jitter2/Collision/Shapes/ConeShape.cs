@@ -28,7 +28,7 @@ public class ConeShape : RigidBodyShape
         get => radius;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Radius));
+            ArgumentCheck.IsPositive(value, nameof(Radius));
             radius = value;
             UpdateWorldBoundingBox();
         }
@@ -45,7 +45,7 @@ public class ConeShape : RigidBodyShape
         get => height;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Height));
+            ArgumentCheck.IsPositive(value, nameof(Height));
             height = value;
             UpdateWorldBoundingBox();
         }
@@ -61,8 +61,8 @@ public class ConeShape : RigidBodyShape
     /// </exception>
     public ConeShape(Real radius = (Real)0.5, Real height = (Real)1.0)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(radius);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        ArgumentCheck.IsPositive(radius, nameof(radius));
+        ArgumentCheck.IsPositive(height, nameof(height));
 
         this.radius = radius;
         this.height = height;

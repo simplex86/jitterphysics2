@@ -27,7 +27,7 @@ public class SphereShape : RigidBodyShape
         get => radius;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Radius));
+            ArgumentCheck.IsPositive(value, nameof(Radius));
             radius = value;
             UpdateWorldBoundingBox();
         }
@@ -42,7 +42,7 @@ public class SphereShape : RigidBodyShape
     /// </exception>
     public SphereShape(Real radius = (Real)1.0)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(radius);
+        ArgumentCheck.IsPositive(radius, nameof(radius));
 
         this.radius = radius;
         UpdateWorldBoundingBox();

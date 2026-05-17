@@ -327,6 +327,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     private Real linearDampingMultiplier = (Real)0.998;
     private Real angularDampingMultiplier = (Real)0.995;
 
+    private JVector force;
+    private JVector torque;
+
     private JMatrix inverseInertia = JMatrix.Identity;
     private Real inverseMass = (Real)1.0;
 
@@ -345,7 +348,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => friction;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            ArgumentCheck.IsNonNegative(value, nameof(value));
             friction = value;
         }
     }
@@ -365,8 +368,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => restitution;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value);
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(value, (Real)1.0);
+            ArgumentCheck.IsInRange(value, (Real)0.0, (Real)1.0, nameof(value));
             restitution = value;
         }
     }
@@ -397,7 +399,11 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     public TimeSpan DeactivationTime
     {
         get => TimeSpan.FromSeconds(deactivationTimeThreshold);
-        set => deactivationTimeThreshold = (Real)value.TotalSeconds;
+        set
+        {
+            ArgumentCheck.IsNonNegative((Real)value.TotalSeconds, nameof(value));
+            deactivationTimeThreshold = (Real)value.TotalSeconds;
+        }
     }
 
     /// <summary>
@@ -417,8 +423,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => (MathR.Sqrt(inactiveThresholdAngularSq), MathR.Sqrt(inactiveThresholdLinearSq));
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value.linear, nameof(value.linear));
-            ArgumentOutOfRangeException.ThrowIfNegative(value.angular, nameof(value.angular));
+            ArgumentCheck.IsNonNegative(value.linear, nameof(value.linear));
+            ArgumentCheck.IsNonNegative(value.angular, nameof(value.angular));
 
             inactiveThresholdLinearSq = value.linear * value.linear;
             inactiveThresholdAngularSq = value.angular * value.angular;
@@ -442,11 +448,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => ((Real)1.0 - linearDampingMultiplier, (Real)1.0 - angularDampingMultiplier);
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(value.linear, nameof(value.linear));
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(value.linear, (Real)1.0, nameof(value.linear));
-
-            ArgumentOutOfRangeException.ThrowIfNegative(value.angular, nameof(value.angular));
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(value.angular, (Real)1.0, nameof(value.angular));
+            ArgumentCheck.IsInRange(value.linear, (Real)0.0, (Real)1.0, nameof(value.linear));
+            ArgumentCheck.IsInRange(value.angular, (Real)0.0, (Real)1.0, nameof(value.angular));
 
             linearDampingMultiplier = (Real)1.0 - value.linear;
             angularDampingMultiplier = (Real)1.0 - value.angular;
@@ -482,6 +485,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => handle.Data.Position;
         set
         {
+            DebugCheck.IsFinite(value, nameof(value));
             handle.Data.Position = value;
             Move();
         }
@@ -500,6 +504,7 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => Data.Orientation;
         set
         {
+            DebugCheck.IsUnitQuaternion(value, nameof(value));
             Data.Orientation = value;
             Move();
         }
@@ -578,6 +583,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => handle.Data.Velocity;
         set
         {
+            DebugCheck.IsFinite(value, nameof(value));
+
             if (handle.Data.MotionType == MotionType.Static)
             {
                 throw new InvalidOperationException(
@@ -609,6 +616,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
         get => handle.Data.AngularVelocity;
         set
         {
+            DebugCheck.IsFinite(value, nameof(value));
+
             if (handle.Data.MotionType == MotionType.Static)
             {
                 throw new InvalidOperationException(
@@ -909,13 +918,29 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// Represents the force to be applied to the body during the next call to <see cref="World.Step(Real, bool)"/>.
     /// This value is automatically reset to zero after the call.
     /// </summary>
-    public JVector Force { get; set; }
+    public JVector Force
+    {
+        get => force;
+        set
+        {
+            DebugCheck.IsFinite(value, nameof(value));
+            force = value;
+        }
+    }
 
     /// <summary>
     /// Represents the torque to be applied to the body during the next call to <see cref="World.Step(Real, bool)"/>.
     /// This value is automatically reset to zero after the call.
     /// </summary>
-    public JVector Torque { get; set; }
+    public JVector Torque
+    {
+        get => torque;
+        set
+        {
+            DebugCheck.IsFinite(value, nameof(value));
+            torque = value;
+        }
+    }
 
     /// <summary>
     /// Applies a force to the rigid body, thereby altering its velocity.
@@ -931,6 +956,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </param>
     public void AddForce(in JVector force, bool wakeup = true)
     {
+        DebugCheck.IsFinite(force, nameof(force));
+
         if ((Data.MotionType != MotionType.Dynamic) || MathHelper.CloseToZero(force)) return;
 
         if (wakeup) SetActivationState(true);
@@ -953,6 +980,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     [ReferenceFrame(ReferenceFrame.World)]
     public void AddForce(in JVector force, in JVector position, bool wakeup = true)
     {
+        DebugCheck.IsFinite(force, nameof(force));
+        DebugCheck.IsFinite(position, nameof(position));
+
         if ((Data.MotionType != MotionType.Dynamic) || MathHelper.CloseToZero(force)) return;
 
         if (wakeup) SetActivationState(true);
@@ -977,6 +1007,8 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </param>
     public void ApplyImpulse(in JVector impulse, bool wakeup = true)
     {
+        DebugCheck.IsFinite(impulse, nameof(impulse));
+
         if ((Data.MotionType != MotionType.Dynamic) || MathHelper.CloseToZero(impulse)) return;
         if (!wakeup && !IsActive) return;
 
@@ -998,6 +1030,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     [ReferenceFrame(ReferenceFrame.World)]
     public void ApplyImpulse(in JVector impulse, in JVector position, bool wakeup = true)
     {
+        DebugCheck.IsFinite(impulse, nameof(impulse));
+        DebugCheck.IsFinite(position, nameof(position));
+
         if ((Data.MotionType != MotionType.Dynamic) || MathHelper.CloseToZero(impulse)) return;
         if (!wakeup && !IsActive) return;
 
@@ -1243,10 +1278,10 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <exception cref="ArgumentException">Thrown if the specified mass is zero or negative.</exception>
     public void SetMassInertia(Real mass)
     {
+        ArgumentCheck.IsFinite(mass, nameof(mass));
+
         if (mass <= (Real)0.0)
         {
-            // we do not protect against NaN here, since it is the users responsibility
-            // to not feed NaNs to the engine.
             throw new ArgumentException("Mass can not be zero or negative.", nameof(mass));
         }
 
@@ -1281,6 +1316,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </exception>
     public void SetMassInertia(in JMatrix inertia, Real mass, bool setAsInverse = false)
     {
+        ArgumentCheck.IsFinite(inertia, nameof(inertia));
+        ArgumentCheck.IsFinite(mass, nameof(mass));
+
         if (setAsInverse)
         {
             if (Real.IsInfinity(mass) || mass < (Real)0.0)

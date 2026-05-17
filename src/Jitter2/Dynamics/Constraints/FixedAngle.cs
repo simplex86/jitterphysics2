@@ -125,19 +125,27 @@ public unsafe class FixedAngle : Constraint<FixedAngle.FixedAngleData>
     public Real Softness
     {
         get => Data.Softness;
-        set => Data.Softness = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.Softness = value;
+        }
     }
 
     /// <summary>
     /// Gets or sets the bias factor controlling how aggressively angular error is corrected.
     /// </summary>
     /// <value>
-    /// Default is 0.2. Range [0, 1]. Higher values correct errors faster but may cause instability.
+    /// Default is 0.2. Higher values correct errors faster but may cause instability.
     /// </value>
     public Real Bias
     {
         get => Data.BiasFactor;
-        set => Data.BiasFactor = value;
+        set
+        {
+            DebugCheck.IsNonNegative(value, nameof(value));
+            Data.BiasFactor = value;
+        }
     }
 
     /// <summary>

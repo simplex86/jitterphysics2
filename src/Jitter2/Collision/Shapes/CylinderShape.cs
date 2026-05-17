@@ -28,7 +28,7 @@ public class CylinderShape : RigidBodyShape
         get => radius;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Radius));
+            ArgumentCheck.IsPositive(value, nameof(Radius));
             radius = value;
             UpdateWorldBoundingBox();
         }
@@ -45,7 +45,7 @@ public class CylinderShape : RigidBodyShape
         get => height;
         set
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Height));
+            ArgumentCheck.IsPositive(value, nameof(Height));
             height = value;
             UpdateWorldBoundingBox();
         }
@@ -62,8 +62,8 @@ public class CylinderShape : RigidBodyShape
     /// </exception>
     public CylinderShape(Real height, Real radius)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(radius);
+        ArgumentCheck.IsPositive(height, nameof(height));
+        ArgumentCheck.IsPositive(radius, nameof(radius));
 
         this.radius = radius;
         this.height = height;
