@@ -244,6 +244,84 @@ public class SleepTests
     }
 
     [TestCase]
+    public void ForceSleepIsland_DeactivatesWholeIslandImmediately()
+    {
+        using var world = new World();
+        world.Gravity = JVector.Zero;
+
+        var body1 = world.CreateRigidBody();
+        body1.AddShape(new SphereShape(1));
+        body1.Velocity = new JVector(1, 0, 0);
+
+        var body2 = world.CreateRigidBody();
+        body2.AddShape(new SphereShape(1));
+        body2.Position = new JVector(2, 0, 0);
+        body2.Velocity = new JVector(-1, 0, 0);
+
+        var constraint = world.CreateConstraint<BallSocket>(body1, body2);
+        constraint.Initialize(JVector.Zero);
+
+        Island island = body1.Island;
+        Assert.That(body2.Island, Is.SameAs(island));
+        Assert.That(world.Islands.IsActive(island), Is.True);
+
+        int deactivated = 0;
+        bool callbackSawInactiveIsland = false;
+
+        world.IslandDeactivated += deactivatedIsland =>
+        {
+            deactivated++;
+            callbackSawInactiveIsland = !world.Islands.IsActive(deactivatedIsland);
+        };
+
+        world.ForceSleepIsland(island);
+
+        Assert.That(deactivated, Is.EqualTo(1));
+        Assert.That(callbackSawInactiveIsland, Is.True);
+        Assert.That(world.Islands.IsActive(island), Is.False);
+        Assert.That(world.RigidBodies.IsActive(body1), Is.False);
+        Assert.That(world.RigidBodies.IsActive(body2), Is.False);
+        Assert.That(body1.IsActive, Is.False);
+        Assert.That(body2.IsActive, Is.False);
+        Assert.That(body1.Velocity, Is.EqualTo(JVector.Zero));
+        Assert.That(body2.Velocity, Is.EqualTo(JVector.Zero));
+    }
+
+    [TestCase]
+    public void ForceSleepIsland_ZeroesKinematicVelocityImmediately()
+    {
+        using var world = new World();
+
+        var body = world.CreateRigidBody();
+        body.AddShape(new BoxShape(1));
+        body.MotionType = MotionType.Kinematic;
+        body.Velocity = new JVector(1, 2, 3);
+        body.AngularVelocity = new JVector(4, 5, 6);
+        body.Force = new JVector(7, 8, 9);
+        body.Torque = new JVector(10, 11, 12);
+
+        world.ForceSleepIsland(body.Island);
+
+        Assert.That(body.IsActive, Is.False);
+        Assert.That(world.Islands.IsActive(body.Island), Is.False);
+        Assert.That(body.Velocity, Is.EqualTo(JVector.Zero));
+        Assert.That(body.AngularVelocity, Is.EqualTo(JVector.Zero));
+        Assert.That(body.Force, Is.EqualTo(JVector.Zero));
+        Assert.That(body.Torque, Is.EqualTo(JVector.Zero));
+    }
+
+    [TestCase]
+    public void ForceSleepIsland_WithForeignIsland_Throws()
+    {
+        using var world = new World();
+        using var otherWorld = new World();
+
+        var foreignBody = otherWorld.CreateRigidBody();
+
+        Assert.Throws<ArgumentException>(() => world.ForceSleepIsland(foreignBody.Island));
+    }
+
+    [TestCase]
     public void IslandDeactivatedEventIsRaisedAfterIslandSleeps()
     {
         var world = new World();
