@@ -1,5 +1,13 @@
 # Changelog
 
+### Jitter 2.8.7 (2026-05-17)
+
+- Added `World.ForceSleepIsland` for immediately deactivating an island.
+- Added argument validation for invalid shape dimensions, masses, constraint axes, and limits.
+- Added debug-only checks for runtime state changes.
+- Improved cleanup when simulation fails or gets interrupted.
+- Fixed empty `DynamicTree` cost calculation.
+
 ### Jitter 2.8.6 (2026-05-15)
 
 - Added support for using multiple `World` instances from different host threads.
