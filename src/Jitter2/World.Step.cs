@@ -1172,6 +1172,65 @@ public sealed partial class World
 
     private readonly Stack<(Island Island, bool RaiseEvent)> inactivateIslands = new();
 
+    private static void ClearMotionForSleep(RigidBody body)
+    {
+        ref RigidBodyData rigidBody = ref body.Data;
+
+        rigidBody.Velocity = JVector.Zero;
+        rigidBody.AngularVelocity = JVector.Zero;
+        rigidBody.DeltaVelocity = JVector.Zero;
+        rigidBody.DeltaAngularVelocity = JVector.Zero;
+
+        body.Force = JVector.Zero;
+        body.Torque = JVector.Zero;
+        body.InternalSleepTime = Real.PositiveInfinity;
+    }
+
+    private bool DeactivateBodyForSleep(RigidBody body, bool clearMotion)
+    {
+        if (clearMotion) ClearMotionForSleep(body);
+
+        ref RigidBodyData rigidBody = ref body.Data;
+        bool wasActive = rigidBody.IsActive;
+
+        rigidBody.IsActive = false;
+
+        memRigidBodies.MoveToInactive(body.Handle);
+        bodies.MoveToInactive(body);
+
+        bool deactivatedBody = wasActive && body.MotionType != MotionType.Static;
+
+        // Static bodies have contacts and constraints, but they do not form
+        // collision islands. Do not deactivate contacts or constraints of
+        // static bodies, as the island of the static body goes to sleep.
+        if (body.MotionType != MotionType.Static)
+        {
+            foreach (var c in body.InternalContacts)
+            {
+                memContacts.MoveToInactive(c.Handle);
+            }
+
+            foreach (var c in body.InternalConstraints)
+            {
+                if (c.IsSmallConstraint)
+                {
+                    memSmallConstraints.MoveToInactive(c.SmallHandle);
+                }
+                else
+                {
+                    memConstraints.MoveToInactive(c.Handle);
+                }
+            }
+        }
+
+        foreach (var s in body.InternalShapes)
+        {
+            DynamicTree.DeactivateProxy(s);
+        }
+
+        return deactivatedBody;
+    }
+
     private void CheckDeactivation()
     {
         for (int i = 0; i < islands.ActiveCount; i++)
@@ -1206,40 +1265,7 @@ public sealed partial class World
 
                 if (deactivateIsland)
                 {
-                    rigidBody.IsActive = false;
-
-                    memRigidBodies.MoveToInactive(body.Handle);
-                    bodies.MoveToInactive(body);
-
-                    // Static bodies have contacts and constraints, but they do not form
-                    // collision islands. Do not deactivate contacts or constraint
-                    // of static bodies, as the island of the static body goes to sleep.
-                    if (body.MotionType != MotionType.Static)
-                    {
-                        deactivatedBody = true;
-                        
-                        foreach (var c in body.InternalContacts)
-                        {
-                            memContacts.MoveToInactive(c.Handle);
-                        }
-
-                        foreach (var c in body.InternalConstraints)
-                        {
-                            if (c.IsSmallConstraint)
-                            {
-                                memSmallConstraints.MoveToInactive(c.SmallHandle);
-                            }
-                            else
-                            {
-                                memConstraints.MoveToInactive(c.Handle);
-                            }
-                        }
-                    }
-
-                    foreach (var s in body.InternalShapes)
-                    {
-                        DynamicTree.DeactivateProxy(s);
-                    }
+                    deactivatedBody |= DeactivateBodyForSleep(body, clearMotion: false);
                 }
                 else
                 {

@@ -612,6 +612,52 @@ public sealed partial class World : IDisposable
     }
 
     /// <summary>
+    /// Immediately deactivates the specified island and clears motion state for all bodies in it.
+    /// </summary>
+    /// <remarks>
+    /// This operation ignores <see cref="AllowDeactivation"/> and does not wait for the next
+    /// simulation step. Dynamic and kinematic bodies in the island have their linear and angular
+    /// velocities, queued forces, queued torques, and force-derived velocity deltas set to zero.
+    /// </remarks>
+    /// <param name="island">The island to deactivate.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="island"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="island"/> does not belong to this world.</exception>
+    public void ForceSleepIsland(Island island)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(island);
+
+        if (!islands.Contains(island))
+        {
+            throw new ArgumentException("The island does not belong to this world.", nameof(island));
+        }
+
+        foreach (RigidBody body in island.InternalBodies)
+        {
+            ClearMotionForSleep(body);
+        }
+
+        island.MarkedAsActive = false;
+        island.NeedsUpdate = false;
+
+        if (!islands.IsActive(island)) return;
+
+        bool deactivatedBody = false;
+
+        foreach (RigidBody body in island.InternalBodies)
+        {
+            deactivatedBody |= DeactivateBodyForSleep(body, clearMotion: false);
+        }
+
+        islands.MoveToInactive(island);
+
+        if (deactivatedBody)
+        {
+            IslandDeactivated?.Invoke(island);
+        }
+    }
+
+    /// <summary>
     /// Constructs a constraint of the specified type. After creation, initialize the constraint
     /// by calling its <c>Initialize</c> method.
     /// </summary>
