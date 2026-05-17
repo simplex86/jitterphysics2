@@ -20,6 +20,13 @@ namespace Jitter2.Collision;
 /// </summary>
 public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
 {
+    private enum EdgeContactEvaluation
+    {
+        Keep,
+        Discard,
+        Edge
+    }
+
     /// <summary>
     /// Gets or sets the distance threshold for edge collision detection, in world units.
     /// </summary>
@@ -69,6 +76,65 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
         point -= distance * normal;
     }
 
+    private EdgeContactEvaluation EvaluateTriangleContact(TriangleShape triangleShape, bool triangleIsShapeB,
+        in JVector contactPoint, in JVector normal, out JVector triangleNormal, out JVector neighborNormal)
+    {
+        ref readonly var triangle = ref triangleShape.Mesh.Indices[triangleShape.Index];
+
+        triangleNormal = triangle.Normal;
+        triangleNormal = JVector.Transform(triangleNormal, triangleShape.RigidBody.Data.Orientation);
+        neighborNormal = default;
+
+        if (triangleIsShapeB) JVector.NegateInPlace(ref triangleNormal);
+
+        // Make triangles penetrable from one side.
+        if (JVector.Dot(normal, triangleNormal) < -cosAngle) return EdgeContactEvaluation.Discard;
+
+        triangleShape.GetWorldVertices(out JVector a, out JVector b, out JVector c);
+
+        JVector projectedContactPoint = contactPoint;
+        ProjectPointOnPlane(ref projectedContactPoint, a, b, c);
+
+        var n = b - a;
+        var pma = projectedContactPoint - a;
+        var d0 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
+
+        n = c - a;
+        pma = projectedContactPoint - a;
+        var d1 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
+
+        n = c - b;
+        pma = projectedContactPoint - b;
+        var d2 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
+
+        if (MathR.Min(MathR.Min(d0, d1), d2) > EdgeThreshold * EdgeThreshold)
+        {
+            return EdgeContactEvaluation.Keep;
+        }
+
+        if (d0 < d1 && d0 < d2)
+        {
+            if (triangle.NeighborC == -1) return EdgeContactEvaluation.Keep;
+            neighborNormal = triangleShape.Mesh.Indices[triangle.NeighborC].Normal;
+        }
+        else if (d1 < d2)
+        {
+            if (triangle.NeighborB == -1) return EdgeContactEvaluation.Keep;
+            neighborNormal = triangleShape.Mesh.Indices[triangle.NeighborB].Normal;
+        }
+        else
+        {
+            if (triangle.NeighborA == -1) return EdgeContactEvaluation.Keep;
+            neighborNormal = triangleShape.Mesh.Indices[triangle.NeighborA].Normal;
+        }
+
+        neighborNormal = JVector.Transform(neighborNormal, triangleShape.RigidBody.Data.Orientation);
+
+        if (triangleIsShapeB) JVector.NegateInPlace(ref neighborNormal);
+
+        return EdgeContactEvaluation.Edge;
+    }
+
     /// <inheritdoc />
     public bool Filter(RigidBodyShape shapeA, RigidBodyShape shapeB,
         ref JVector pointA, ref JVector pointB, ref JVector normal, ref Real penetration)
@@ -84,67 +150,20 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
 
         TriangleShape triangleShape;
 
-        JVector collP;
-
         if (c1)
         {
             triangleShape = ts1!;
-            collP = pointA;
         }
         else
         {
             triangleShape = ts2!;
-            collP = pointB;
         }
 
-        ref readonly var triangle = ref triangleShape.Mesh.Indices[triangleShape.Index];
+        EdgeContactEvaluation evaluation = EvaluateTriangleContact(triangleShape, c2,
+            c1 ? pointA : pointB, normal, out JVector tnormal, out JVector nnormal);
 
-        JVector tnormal = triangle.Normal;
-        tnormal = JVector.Transform(tnormal, triangleShape.RigidBody.Data.Orientation);
-
-        if (c2) JVector.NegateInPlace(ref tnormal);
-
-        // Make triangles penetrable from one side
-        if (JVector.Dot(normal, tnormal) < -cosAngle) return false;
-
-        triangleShape.GetWorldVertices(out JVector a, out JVector b, out JVector c);
-
-        // project collP onto triangle plane
-        ProjectPointOnPlane(ref collP, a, b, c);
-
-        var n = b - a;
-        var pma = collP - a;
-        var d0 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
-
-        n = c - a;
-        pma = collP - a;
-        var d1 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
-
-        n = c - b;
-        pma = collP - b;
-        var d2 = (pma - JVector.Dot(pma, n) * n * ((Real)1.0 / n.LengthSquared())).LengthSquared();
-
-        if (MathR.Min(MathR.Min(d0, d1), d2) > EdgeThreshold * EdgeThreshold) return true;
-
-        JVector nnormal;
-
-        if (d0 < d1 && d0 < d2)
-        {
-            if (triangle.NeighborC == -1) return true;
-            nnormal = triangleShape.Mesh.Indices[triangle.NeighborC].Normal;
-        }
-        else if (d1 < d2)
-        {
-            if (triangle.NeighborB == -1) return true;
-            nnormal = triangleShape.Mesh.Indices[triangle.NeighborB].Normal;
-        }
-        else
-        {
-            if (triangle.NeighborA == -1) return true;
-            nnormal = triangleShape.Mesh.Indices[triangle.NeighborA].Normal;
-        }
-
-        nnormal = JVector.Transform(nnormal, triangleShape.RigidBody.Data.Orientation);
+        if (evaluation == EdgeContactEvaluation.Discard) return false;
+        if (evaluation == EdgeContactEvaluation.Keep) return true;
 
         ref var b1Data = ref shapeA.RigidBody.Data;
         ref var b2Data = ref shapeB.RigidBody.Data;
@@ -168,9 +187,13 @@ public class TriangleEdgeCollisionFilter : INarrowPhaseFilter
                 // this should not happen
                 return false;
             }
-        }
 
-        if (c2) JVector.NegateInPlace(ref nnormal);
+            evaluation = EvaluateTriangleContact(triangleShape, c2,
+                c1 ? pointA : pointB, normal, out tnormal, out nnormal);
+
+            if (evaluation == EdgeContactEvaluation.Discard) return false;
+            if (evaluation == EdgeContactEvaluation.Keep) return true;
+        }
 
         JVector midPoint = (Real)0.5 * (pointA + pointB);
 
