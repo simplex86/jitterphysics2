@@ -313,6 +313,9 @@ public sealed partial class World : IDisposable
     /// Sub-stepping is deactivated when set to one.
     /// Default value: 1.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the assigned value is less than one.
+    /// </exception>
     public int SubstepCount
     {
         get => substeps;
@@ -410,6 +413,7 @@ public sealed partial class World : IDisposable
     /// and constraints.
     /// </summary>
     /// <param name="body">The rigid body to remove.</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="body"/> does not belong to this world.</exception>
     public void Remove(RigidBody body)
     {
         if (body.World != this)
@@ -456,6 +460,9 @@ public sealed partial class World : IDisposable
     /// <see cref="Constraint.IsEnabled"/> property.
     /// </summary>
     /// <param name="constraint">The constraint to be removed.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown if <paramref name="constraint"/> does not belong to this world.
+    /// </exception>
     public void Remove(Constraint constraint)
     {
         if (constraint.Body1.World != this)
@@ -481,6 +488,10 @@ public sealed partial class World : IDisposable
     /// <summary>
     /// Removes a particular arbiter from the world.
     /// </summary>
+    /// <param name="arbiter">The arbiter to remove.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown if <paramref name="arbiter"/> does not belong to this world.
+    /// </exception>
     public void Remove(Arbiter arbiter)
     {
         if (arbiter.Body1.World != this)
@@ -665,6 +676,9 @@ public sealed partial class World : IDisposable
     /// <param name="body1">The first rigid body involved in the constraint.</param>
     /// <param name="body2">The second rigid body involved in the constraint.</param>
     /// <returns>A new instance of the specified constraint type, already registered with the world.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown if either body does not belong to this world.
+    /// </exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="body1"/> and <paramref name="body2"/> are the same.</exception>
     /// <exception cref="PartitionedBuffer{T}.MaximumSizeException">Raised when the maximum size limit is exceeded.</exception>
     public T CreateConstraint<T>(RigidBody body1, RigidBody body2) where T : Constraint, new()

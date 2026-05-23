@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using Jitter2.LinearMath;
 
 namespace Jitter2.Dynamics.Constraints;
@@ -21,6 +22,14 @@ public class UniversalJoint : Joint
     public BallSocket BallSocket { get; }
     public AngularMotor? Motor { get; }
 
+    /// <summary>
+    /// Initializes a new universal joint.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="center"/> contains a non-finite value, when either rotation axis is zero
+    /// or contains a non-finite value, when either body does not belong to <paramref name="world"/>,
+    /// or when both body references are the same.
+    /// </exception>
     public UniversalJoint(World world, RigidBody body1, RigidBody body2, JVector center, JVector rotateAxis1, JVector rotateAxis2, bool hasMotor = false)
     {
         Body1 = body1;

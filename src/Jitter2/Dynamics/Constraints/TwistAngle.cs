@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.LinearMath;
@@ -66,6 +67,10 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     /// Stores each axis in the local frame of its body and records the initial relative orientation.
     /// Default values: <see cref="Softness"/> = <see cref="Constraint.DefaultAngularSoftness"/>, <see cref="Bias"/> = <see cref="Constraint.DefaultAngularBias"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis1"/> or <paramref name="axis2"/> is zero or contains a non-finite value,
+    /// or when either value in <paramref name="limit"/> is not finite.
+    /// </exception>
     public void Initialize(JVector axis1, JVector axis2, AngularLimit limit)
     {
         VerifyNotZero();
@@ -111,6 +116,9 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     /// <summary>
     /// Sets the angular limits for the twist rotation.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when either assigned limit value is not finite.
+    /// </exception>
     public AngularLimit Limit
     {
         set
@@ -129,6 +137,9 @@ public unsafe class TwistAngle : Constraint<TwistAngle.TwistLimitData>
     /// </summary>
     /// <param name="axis1">The twist axis for body 1 in world space.</param>
     /// <param name="axis2">The twist axis for body 2 in world space.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis1"/> or <paramref name="axis2"/> is zero or contains a non-finite value.
+    /// </exception>
     public void Initialize(JVector axis1, JVector axis2)
     {
         Initialize(axis1, axis2, AngularLimit.Fixed);

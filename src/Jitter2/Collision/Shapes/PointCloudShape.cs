@@ -39,6 +39,9 @@ public class PointCloudShape : RigidBodyShape, ICloneableShape<PointCloudShape>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="vertices"/> is empty.
     /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when <paramref name="vertices"/> does not define a non-degenerate volume.
+    /// </exception>
     public PointCloudShape(ReadOnlySpan<JVector> vertices)
     {
         supportMap = new VertexSupportMap(vertices);
@@ -48,6 +51,9 @@ public class PointCloudShape : RigidBodyShape, ICloneableShape<PointCloudShape>
     /// <summary>
     /// Initializes a new instance of the <see cref="PointCloudShape"/> class.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when <paramref name="supportMap"/> does not define a non-degenerate volume.
+    /// </exception>
     public PointCloudShape(VertexSupportMap supportMap)
     {
         this.supportMap = supportMap;
@@ -93,6 +99,9 @@ public class PointCloudShape : RigidBodyShape, ICloneableShape<PointCloudShape>
     /// <summary>
     /// Updates the shape's cached mass, inertia, and bounding box.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the point cloud does not define a non-degenerate volume.
+    /// </exception>
     public void UpdateShape()
     {
         CalculateMassInertia();
@@ -102,6 +111,9 @@ public class PointCloudShape : RigidBodyShape, ICloneableShape<PointCloudShape>
     /// <summary>
     /// Recalculates the mass, center of mass, and inertia tensor.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the point cloud does not define a non-degenerate volume.
+    /// </exception>
     public void CalculateMassInertia()
     {
         ShapeHelper.CalculateMassInertia(this, out cachedInertia, out cachedCenter, out cachedMass);

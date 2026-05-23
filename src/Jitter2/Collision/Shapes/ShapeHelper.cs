@@ -133,6 +133,9 @@ public static class ShapeHelper
     /// The tessellated hull may not be perfectly convex. It is therefore not suited to be used with
     /// <see cref="ConvexHullShape"/>. The time complexity is O(4^n), where n is the number of subdivisions.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="vertices"/> is empty.
+    /// </exception>
     public static List<JTriangle> Tessellate(ReadOnlySpan<JVector> vertices, int subdivisions = 3)
     {
         return Tessellate(new VertexSupportMap(vertices), subdivisions);
@@ -221,6 +224,9 @@ public static class ShapeHelper
     /// triangles, projecting new vertices onto the unit sphere. Each final vertex direction is passed to the support
     /// mapper to generate a hull point. The time complexity is O(4^n), where n is the number of subdivisions.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="vertices"/> is empty.
+    /// </exception>
     public static List<JVector> SampleHull(ReadOnlySpan<JVector> vertices, int subdivisions = 3)
     {
         return SampleHull(new VertexSupportMap(vertices), subdivisions);

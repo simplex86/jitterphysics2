@@ -172,6 +172,9 @@ public sealed unsafe class PartitionedBuffer<T> : IDisposable where T : unmanage
     /// </summary>
     /// <param name="initialSize">The initial size of the contiguous memory block.</param>
     /// <param name="aligned64">Indicates whether the memory should be aligned to 64 bytes.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <typeparamref name="T"/> is too small to store the internal element ID.
+    /// </exception>
     public PartitionedBuffer(int initialSize = 1024, bool aligned64 = false)
     {
         if (sizeof(T) < sizeof(int))
@@ -367,6 +370,9 @@ public sealed unsafe class PartitionedBuffer<T> : IDisposable where T : unmanage
     /// <b>Threading:</b> This method may resize the buffer, which moves all data. Use
     /// <see cref="ResizeLock"/> when calling concurrently with data access.
     /// </remarks>
+    /// <exception cref="MaximumSizeException">
+    /// Thrown when the internal indirection table limit is reached.
+    /// </exception>
     public JHandle<T> Allocate(bool active = false, bool clear = false)
     {
         Debug.Assert(!disposed);

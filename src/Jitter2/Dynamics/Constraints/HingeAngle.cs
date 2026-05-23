@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.LinearMath;
@@ -70,6 +71,10 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     /// Default values: <see cref="Softness"/> = <see cref="Constraint.DefaultAngularSoftness"/>, <see cref="LimitSoftness"/> = <see cref="Constraint.DefaultAngularLimitSoftness"/>,
     /// <see cref="Bias"/> = <see cref="Constraint.DefaultAngularBias"/>, <see cref="LimitBias"/> = <see cref="Constraint.DefaultAngularLimitBias"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis"/> is zero or contains a non-finite value, or when
+    /// either value in <paramref name="limit"/> is not finite.
+    /// </exception>
     public void Initialize(JVector axis, AngularLimit limit)
     {
         VerifyNotZero();
@@ -101,6 +106,9 @@ public unsafe class HingeAngle : Constraint<HingeAngle.HingeAngleData>
     /// <summary>
     /// Sets the angular limits for the hinge rotation.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when either assigned limit value is not finite.
+    /// </exception>
     public AngularLimit Limit
     {
         set
