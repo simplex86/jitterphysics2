@@ -20,6 +20,26 @@ public class ArgumentValidationTests
     }
 
     [Test]
+    public void PointCloudShape_WithDegenerateVertices_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => _ = new PointCloudShape([JVector.Zero]));
+
+        Assert.Throws<InvalidOperationException>(() => _ = new PointCloudShape([
+            JVector.Zero,
+            JVector.UnitX,
+            JVector.UnitY,
+            JVector.UnitX + JVector.UnitY
+        ]));
+
+        Assert.Throws<InvalidOperationException>(() => _ = new PointCloudShape([
+            new JVector(-1, -1, 1),
+            new JVector(+1, -1, 1),
+            new JVector(+1, +1, 1),
+            new JVector(-1, +1, 1)
+        ]));
+    }
+
+    [Test]
     public void SupportPrimitiveCreation_WithInfiniteDimension_Throws()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => _ = SupportPrimitives.CreateSphere(Real.PositiveInfinity));

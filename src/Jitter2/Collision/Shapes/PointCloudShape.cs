@@ -105,6 +105,13 @@ public class PointCloudShape : RigidBodyShape, ICloneableShape<PointCloudShape>
     public void CalculateMassInertia()
     {
         ShapeHelper.CalculateMassInertia(this, out cachedInertia, out cachedCenter, out cachedMass);
+
+        const Real minimumMass = (Real)1e-12;
+
+        if (!Real.IsFinite(cachedMass) || cachedMass <= minimumMass)
+        {
+            throw new InvalidOperationException("Point cloud must define a non-degenerate volume.");
+        }
     }
 
     /// <inheritdoc/>
