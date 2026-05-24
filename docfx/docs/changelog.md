@@ -1,5 +1,11 @@
 # Changelog
 
+### Jitter 2.8.8 (2026-05-24)
+
+- Fixed triangle edge contact filtering by re-evaluating contacts after EPA.
+- Rejected degenerate `PointCloudShape` volumes and zero-mass `ConvexHullShape` inputs during construction.
+- Improved exception reporting for validation failures. Also added XML documentation for public exception behavior.
+
 ### Jitter 2.8.7 (2026-05-17)
 
 - Added `World.ForceSleepIsland` for immediately deactivating an island.
