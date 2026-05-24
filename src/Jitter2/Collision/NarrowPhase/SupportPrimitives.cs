@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using Jitter2.LinearMath;
 
 namespace Jitter2.Collision;
@@ -13,16 +14,60 @@ namespace Jitter2.Collision;
 /// </summary>
 public static class SupportPrimitives
 {
+    /// <summary>
+    /// Creates a point support primitive at the origin.
+    /// </summary>
     public static Point CreatePoint() => default;
 
+    /// <summary>
+    /// Creates a sphere support primitive.
+    /// </summary>
+    /// <param name="radius">The sphere radius.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="radius"/> is less than or equal to zero or not finite.
+    /// </exception>
     public static Sphere CreateSphere(Real radius) => new(radius);
 
+    /// <summary>
+    /// Creates a box support primitive.
+    /// </summary>
+    /// <param name="halfExtents">The positive half-extents of the box.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when any component of <paramref name="halfExtents"/> is less than or equal to zero or not finite.
+    /// </exception>
     public static Box CreateBox(JVector halfExtents) => new(halfExtents);
 
+    /// <summary>
+    /// Creates a capsule support primitive whose symmetry axis is the Y-axis.
+    /// </summary>
+    /// <param name="radius">The capsule radius.</param>
+    /// <param name="halfLength">The non-negative half-length of the capsule segment.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="radius"/> is less than or equal to zero, when
+    /// <paramref name="halfLength"/> is negative, or when either value is not finite.
+    /// </exception>
     public static Capsule CreateCapsule(Real radius, Real halfLength) => new(radius, halfLength);
 
+    /// <summary>
+    /// Creates a cylinder support primitive whose symmetry axis is the Y-axis.
+    /// </summary>
+    /// <param name="radius">The cylinder radius.</param>
+    /// <param name="halfHeight">The positive half-height of the cylinder.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="radius"/> or <paramref name="halfHeight"/> is less than or equal to zero
+    /// or not finite.
+    /// </exception>
     public static Cylinder CreateCylinder(Real radius, Real halfHeight) => new(radius, halfHeight);
 
+    /// <summary>
+    /// Creates a cone support primitive whose symmetry axis is the Y-axis.
+    /// </summary>
+    /// <param name="radius">The cone radius.</param>
+    /// <param name="height">The cone height.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="radius"/> or <paramref name="height"/> is less than or equal to zero
+    /// or not finite.
+    /// </exception>
     public static Cone CreateCone(Real radius, Real height) => new(radius, height);
 
     /// <summary>

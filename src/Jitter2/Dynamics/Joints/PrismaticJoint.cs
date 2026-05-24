@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using Jitter2.LinearMath;
 
 namespace Jitter2.Dynamics.Constraints;
@@ -23,12 +24,21 @@ public class PrismaticJoint : Joint
     public HingeAngle? HingeAngle { get; }
     public LinearMotor? Motor { get; }
 
+    /// <inheritdoc cref="PrismaticJoint(World, RigidBody, RigidBody, JVector, JVector, LinearLimit, bool, bool)"/>
     public PrismaticJoint(World world, RigidBody body1, RigidBody body2, JVector center, JVector axis,
         bool pinned = true, bool hasMotor = false) :
         this(world, body1, body2, center, axis, LinearLimit.Full, pinned, hasMotor)
     {
     }
 
+    /// <summary>
+    /// Initializes a new prismatic joint.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="center"/> contains a non-finite value, when <paramref name="axis"/> is zero
+    /// or contains a non-finite value, when either limit value is NaN, when either body does not belong to
+    /// <paramref name="world"/>, or when both body references are the same.
+    /// </exception>
     public PrismaticJoint(World world, RigidBody body1, RigidBody body2, JVector center, JVector axis, LinearLimit limit,
         bool pinned = true, bool hasMotor = false)
     {

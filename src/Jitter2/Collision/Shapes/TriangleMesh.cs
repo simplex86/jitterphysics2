@@ -18,8 +18,30 @@ namespace Jitter2.Collision.Shapes;
 /// </summary>
 public class TriangleMesh
 {
-    public sealed class DegenerateTriangleException(JTriangle triangle) :
-        Exception($"Degenerate triangle found: {triangle}.");
+    public sealed class DegenerateTriangleException : Exception
+    {
+        public DegenerateTriangleException()
+        {
+        }
+
+        public DegenerateTriangleException(string message)
+            : base(message)
+        {
+        }
+
+        public DegenerateTriangleException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
+
+        public DegenerateTriangleException(JTriangle triangle)
+            : base($"Degenerate triangle found: {triangle}.")
+        {
+            Triangle = triangle;
+        }
+
+        public JTriangle Triangle { get; }
+    }
 
     private readonly struct Edge(int indexA, int indexB) : IEquatable<Edge>
     {
@@ -53,6 +75,11 @@ public class TriangleMesh
     /// <summary>
     /// Creates a mesh from a "soup" of triangles. Vertices are automatically identified and deduplicated.
     /// </summary>
+    /// <param name="soup">The triangles used to build the mesh.</param>
+    /// <param name="ignoreDegenerated">If <see langword="true"/>, degenerate triangles are skipped.</param>
+    /// <exception cref="DegenerateTriangleException">
+    /// Thrown when a degenerate triangle is found and <paramref name="ignoreDegenerated"/> is <see langword="false"/>.
+    /// </exception>
     public TriangleMesh(ReadOnlySpan<JTriangle> soup, bool ignoreDegenerated = false)
     {
         BuildFromSoup(soup, ignoreDegenerated);
@@ -69,10 +96,20 @@ public class TriangleMesh
     /// </summary>
     /// <param name="vertices">The vertex buffer.</param>
     /// <param name="indices">The index buffer (must be a multiple of 3).</param>
+    /// <param name="ignoreDegenerated">If <see langword="true"/>, degenerate triangles are skipped.</param>
     /// <remarks>
     /// Vertices with exactly identical positions are canonicalized so adjacency detection also works
     /// across duplicated seam vertices in indexed meshes.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="indices"/> does not contain a multiple of three entries.
+    /// </exception>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when an index references an element outside <paramref name="vertices"/>.
+    /// </exception>
+    /// <exception cref="DegenerateTriangleException">
+    /// Thrown when a degenerate triangle is found and <paramref name="ignoreDegenerated"/> is <see langword="false"/>.
+    /// </exception>
     public TriangleMesh(ReadOnlySpan<JVector> vertices, ReadOnlySpan<int> indices, bool ignoreDegenerated = false)
     {
         BuildFromIndexed(vertices, indices, ignoreDegenerated);
@@ -100,35 +137,51 @@ public class TriangleMesh
     /// <summary>
     /// Creates a mesh from custom vertices (e.g. System.Numerics.Vector3) and indices.
     /// </summary>
+    /// <typeparam name="TVertex">The unmanaged vertex type. It must have the same size as <see cref="JVector"/>.</typeparam>
+    /// <param name="vertices">The vertex buffer.</param>
+    /// <param name="indices">The index buffer (must be a multiple of 3).</param>
+    /// <param name="ignoreDegenerated">If <see langword="true"/>, degenerate triangles are skipped.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <typeparamref name="TVertex"/> does not have the same size as <see cref="JVector"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="indices"/> does not contain a multiple of three entries.
+    /// </exception>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when an index references an element outside <paramref name="vertices"/>.
+    /// </exception>
+    /// <exception cref="DegenerateTriangleException">
+    /// Thrown when a degenerate triangle is found and <paramref name="ignoreDegenerated"/> is <see langword="false"/>.
+    /// </exception>
     public static TriangleMesh Create<TVertex>(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<int> indices,
         bool ignoreDegenerated = false) where TVertex : unmanaged
     {
-        return new TriangleMesh(CastVertices(vertices), indices, ignoreDegenerated);
+        return new TriangleMesh(CastVertices(vertices, nameof(vertices)), indices, ignoreDegenerated);
     }
 
     /// <inheritdoc cref="Create{TVertex}(ReadOnlySpan{TVertex}, ReadOnlySpan{int}, bool)"/>
     public static TriangleMesh Create<TVertex>(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices,
         bool ignoreDegenerated = false) where TVertex : unmanaged
     {
-        return new TriangleMesh(CastVertices(vertices), indices, ignoreDegenerated);
+        return new TriangleMesh(CastVertices(vertices, nameof(vertices)), indices, ignoreDegenerated);
     }
 
     /// <inheritdoc cref="Create{TVertex}(ReadOnlySpan{TVertex}, ReadOnlySpan{int}, bool)"/>
     public static TriangleMesh Create<TVertex>(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<ushort> indices,
         bool ignoreDegenerated = false) where TVertex : unmanaged
     {
-        return new TriangleMesh(CastVertices(vertices), indices, ignoreDegenerated);
+        return new TriangleMesh(CastVertices(vertices, nameof(vertices)), indices, ignoreDegenerated);
     }
 
     // Helper to keep the casting logic in one place
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ReadOnlySpan<JVector> CastVertices<TVertex>(ReadOnlySpan<TVertex> vertices)
+    private static ReadOnlySpan<JVector> CastVertices<TVertex>(ReadOnlySpan<TVertex> vertices, string paramName)
         where TVertex : unmanaged
     {
         if (Unsafe.SizeOf<TVertex>() != Unsafe.SizeOf<JVector>())
         {
             throw new ArgumentException($"Size mismatch: {typeof(TVertex).Name} ({Unsafe.SizeOf<TVertex>()} bytes) " +
-                                        $"does not match JVector ({Unsafe.SizeOf<JVector>()} bytes).");
+                                        $"does not match JVector ({Unsafe.SizeOf<JVector>()} bytes).", paramName);
         }
 
         return MemoryMarshal.Cast<TVertex, JVector>(vertices);
@@ -180,7 +233,7 @@ public class TriangleMesh
 
     private void BuildFromIndexed(ReadOnlySpan<JVector> vertices, ReadOnlySpan<int> indices, bool ignoreDegenerated)
     {
-        if (indices.Length % 3 != 0) throw new ArgumentException("Indices must be a multiple of 3.");
+        if (indices.Length % 3 != 0) throw new ArgumentException("Indices must be a multiple of 3.", nameof(indices));
 
         var deduplicatedVertices = new List<JVector>(vertices.Length);
         var vertexMap = new Dictionary<JVector, int>(vertices.Length);

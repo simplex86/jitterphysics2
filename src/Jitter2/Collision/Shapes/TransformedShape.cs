@@ -29,6 +29,15 @@ public class TransformedShape : RigidBodyShape
     /// Constructs a transformed shape through an affine transformation defined by
     /// a linear map and a translation.
     /// </summary>
+    /// <param name="shape">The shape to transform.</param>
+    /// <param name="translation">The translation component of the affine transform.</param>
+    /// <param name="transform">The linear component of the affine transform.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="shape"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="translation"/> or <paramref name="transform"/> contains a non-finite value.
+    /// </exception>
     public TransformedShape(RigidBodyShape shape, in JVector translation, in JMatrix transform)
     {
         ArgumentNullException.ThrowIfNull(shape);

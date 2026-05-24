@@ -20,6 +20,13 @@ public struct VertexSupportMap : ISupportMappable, IEquatable<VertexSupportMap>
     private readonly Real[] xvalues, yvalues, zvalues;
     private JVector center;
 
+    /// <summary>
+    /// Initializes a new support map from a set of vertices.
+    /// </summary>
+    /// <param name="vertices">The vertices defining the convex hull.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="vertices"/> is empty.
+    /// </exception>
     public VertexSupportMap(ReadOnlySpan<JVector> vertices)
     {
         if (vertices.Length == 0)
@@ -47,6 +54,7 @@ public struct VertexSupportMap : ISupportMappable, IEquatable<VertexSupportMap>
         center *= (Real)1.0 / length;
     }
 
+    /// <inheritdoc cref="VertexSupportMap(ReadOnlySpan{JVector})"/>
     public VertexSupportMap(IEnumerable<JVector> vertices) :
         this(SpanHelper.AsReadOnlySpan(vertices, out _))
     {

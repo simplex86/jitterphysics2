@@ -394,6 +394,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// remain below the <see cref="DeactivationThreshold"/> for the specified time, its island can be deactivated.
     /// Default value: 1 second.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the assigned value is negative.
+    /// </exception>
     public TimeSpan DeactivationTime
     {
         get => TimeSpan.FromSeconds(deactivationTimeThreshold);
@@ -809,6 +812,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// recalculated only once, if requested.
     /// </summary>
     /// <param name="shapes">The shapes to add.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shapes"/> or any contained shape is <see langword="null"/>.
+    /// </exception>
     /// <exception cref="ArgumentException">Thrown if any shape is already attached to a body.</exception>
     public void AddShapes(IEnumerable<RigidBodyShape> shapes)
         => AddShapes(shapes, MassInertiaUpdateMode.Update);
@@ -825,7 +831,13 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <param name="massInertiaMode">
     /// Controls whether the body's mass and inertia are recomputed after the shapes are added.
     /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shapes"/> or any contained shape is <see langword="null"/>.
+    /// </exception>
     /// <exception cref="ArgumentException">Thrown if any shape is already attached to a body.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="massInertiaMode"/> is not a valid <see cref="MassInertiaUpdateMode"/> value.
+    /// </exception>
     public void AddShapes(IEnumerable<RigidBodyShape> shapes, MassInertiaUpdateMode massInertiaMode)
     {
         ArgumentNullException.ThrowIfNull(shapes);
@@ -872,6 +884,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// Adds a shape to the body.
     /// </summary>
     /// <param name="shape">The shape to be added.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shape"/> is <see langword="null"/>.
+    /// </exception>
     /// <exception cref="ArgumentException">
     /// Thrown if the shape is already registered elsewhere.
     /// </exception>
@@ -887,6 +902,12 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </param>
     /// <exception cref="ArgumentException">
     /// Thrown if the shape is already registered elsewhere.
+    /// </exception>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shape"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="massInertiaMode"/> is not a valid <see cref="MassInertiaUpdateMode"/> value.
     /// </exception>
     public void AddShape(RigidBodyShape shape, MassInertiaUpdateMode massInertiaMode)
     {
@@ -1086,6 +1107,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// Removes a specified shape from the rigid body.
     /// </summary>
     /// <param name="shape">The shape to remove from the rigid body.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shape"/> is <see langword="null"/>.
+    /// </exception>
     /// <exception cref="ArgumentException">
     /// Thrown if the specified shape is not part of this rigid body.
     /// </exception>
@@ -1101,6 +1125,12 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// </param>
     /// <exception cref="ArgumentException">
     /// Thrown if the specified shape is not part of this rigid body.
+    /// </exception>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shape"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="massInertiaMode"/> is not a valid <see cref="MassInertiaUpdateMode"/> value.
     /// </exception>
     public void RemoveShape(RigidBodyShape shape, MassInertiaUpdateMode massInertiaMode)
     {
@@ -1131,6 +1161,9 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// Removes several shapes from the body.
     /// </summary>
     /// <param name="shapes">The shapes to remove from the rigid body.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shapes"/> or any contained shape is <see langword="null"/>.
+    /// </exception>
     /// <exception cref="ArgumentException">Thrown if at least one shape is not part of this rigid body.</exception>
     public void RemoveShapes(IEnumerable<RigidBodyShape> shapes)
         => RemoveShapes(shapes, MassInertiaUpdateMode.Update);
@@ -1142,7 +1175,13 @@ public sealed class RigidBody : IPartitionedSetIndex, IDebugDrawable
     /// <param name="massInertiaMode">
     /// Controls whether the body's mass and inertia are recomputed after the shapes are removed.
     /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown if <paramref name="shapes"/> or any contained shape is <see langword="null"/>.
+    /// </exception>
     /// <exception cref="ArgumentException">Thrown if at least one shape is not part of this rigid body.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="massInertiaMode"/> is not a valid <see cref="MassInertiaUpdateMode"/> value.
+    /// </exception>
     public void RemoveShapes(IEnumerable<RigidBodyShape> shapes, MassInertiaUpdateMode massInertiaMode)
     {
         ArgumentNullException.ThrowIfNull(shapes);

@@ -66,6 +66,9 @@ public unsafe class DistanceLimit : Constraint<DistanceLimit.DistanceLimitData>
     /// </summary>
     /// <param name="anchor1">Anchor point on the first body in world space.</param>
     /// <param name="anchor2">Anchor point on the second body in world space.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="anchor1"/> or <paramref name="anchor2"/> contains a non-finite value.
+    /// </exception>
     public void Initialize(JVector anchor1, JVector anchor2)
     {
         Initialize(anchor1, anchor2, LinearLimit.Fixed);
@@ -81,6 +84,10 @@ public unsafe class DistanceLimit : Constraint<DistanceLimit.DistanceLimitData>
     /// Computes local anchor points and the initial distance from current poses.
     /// Default values: <see cref="Softness"/> = <see cref="Constraint.DefaultLinearSoftness"/>, <see cref="Bias"/> = <see cref="Constraint.DefaultLinearBias"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="anchor1"/> or <paramref name="anchor2"/> contains a non-finite value,
+    /// or when either value in <paramref name="limit"/> is NaN.
+    /// </exception>
     public void Initialize(JVector anchor1, JVector anchor2, LinearLimit limit)
     {
         VerifyNotZero();

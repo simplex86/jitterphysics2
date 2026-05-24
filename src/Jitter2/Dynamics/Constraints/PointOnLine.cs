@@ -81,6 +81,11 @@ public unsafe class PointOnLine : Constraint<PointOnLine.PointOnLineData>
     /// Default values: <see cref="Bias"/> = <see cref="Constraint.DefaultLinearBias"/>, <see cref="Softness"/> = <see cref="Constraint.DefaultLinearSoftness"/>,
     /// <see cref="LimitSoftness"/> = <see cref="Constraint.DefaultLinearLimitSoftness"/>, <see cref="LimitBias"/> = <see cref="Constraint.DefaultLinearLimitBias"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis"/> is zero or contains a non-finite value, when
+    /// <paramref name="anchor1"/> or <paramref name="anchor2"/> contains a non-finite value,
+    /// or when either value in <paramref name="limit"/> is NaN.
+    /// </exception>
     public void Initialize(JVector axis, JVector anchor1, JVector anchor2, LinearLimit limit)
     {
         VerifyNotZero();

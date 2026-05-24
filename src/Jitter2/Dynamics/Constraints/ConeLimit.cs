@@ -68,6 +68,13 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     /// the angle between these axes and restricts it to the given range.
     /// Default values: <see cref="Softness"/> = <see cref="Constraint.DefaultAngularSoftness"/>, <see cref="Bias"/> = <see cref="Constraint.DefaultAngularBias"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axisBody1"/> or <paramref name="axisBody2"/> is zero or contains a non-finite value.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="limit"/> is outside the range [0, pi], or when its upper value is smaller
+    /// than its lower value.
+    /// </exception>
     public void Initialize(JVector axisBody1, JVector axisBody2, AngularLimit limit)
     {
         VerifyNotZero();
@@ -106,6 +113,13 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     /// these axes and restricts it to the given range.
     /// Default values: <see cref="Softness"/> = <see cref="Constraint.DefaultAngularSoftness"/>, <see cref="Bias"/> = <see cref="Constraint.DefaultAngularBias"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis"/> is zero or contains a non-finite value.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="limit"/> is outside the range [0, pi], or when its upper value is smaller
+    /// than its lower value.
+    /// </exception>
     public void Initialize(JVector axis, AngularLimit limit)
     {
         if (limit.From > (JAngle)0.0)
@@ -144,6 +158,9 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     /// <summary>
     /// Gets or sets the reference axis of body 1 in world space.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the assigned value is zero or contains a non-finite value.
+    /// </exception>
     public JVector AxisBody1
     {
         get
@@ -171,6 +188,9 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     /// <summary>
     /// Gets or sets the reference axis of body 2 in world space.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the assigned value is zero or contains a non-finite value.
+    /// </exception>
     public JVector AxisBody2
     {
         get
@@ -198,6 +218,10 @@ public unsafe class ConeLimit : Constraint<ConeLimit.ConeLimitData>
     /// <summary>
     /// Gets or sets the angular limit of the cone.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the assigned limit is outside the range [0, pi], or when its upper value is smaller
+    /// than its lower value.
+    /// </exception>
     public AngularLimit Limit
     {
         get

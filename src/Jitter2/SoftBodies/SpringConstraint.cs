@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.Dynamics;
@@ -77,6 +78,9 @@ public unsafe class SpringConstraint : Constraint<SpringConstraint.SpringData>
     /// Default values: <see cref="Softness"/> = <see cref="Constraint.DefaultLinearSoftness"/>, <see cref="Bias"/> = <see cref="Constraint.DefaultLinearBias"/>.
     /// The <see cref="TargetDistance"/> is set to the initial distance between the anchors.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="anchor1"/> or <paramref name="anchor2"/> contains a non-finite value.
+    /// </exception>
     public void Initialize(JVector anchor1, JVector anchor2)
     {
         VerifyNotZero();
@@ -103,6 +107,10 @@ public unsafe class SpringConstraint : Constraint<SpringConstraint.SpringData>
     /// <param name="frequency">The frequency in Hz.</param>
     /// <param name="damping">The damping ratio (0 = no damping, 1 = critical damping).</param>
     /// <param name="dt">The timestep of the simulation.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="frequency"/> or <paramref name="dt"/> is less than or equal to zero,
+    /// when <paramref name="damping"/> is negative, or when any value is not finite.
+    /// </exception>
     public void SetSpringParameters(Real frequency, Real damping, Real dt)
     {
         ArgumentCheck.Positive(frequency, nameof(frequency));

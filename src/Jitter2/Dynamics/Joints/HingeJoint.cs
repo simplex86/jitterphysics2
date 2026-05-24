@@ -21,6 +21,14 @@ public class HingeJoint : Joint
     public BallSocket BallSocket { get; }
     public AngularMotor? Motor { get; }
 
+    /// <summary>
+    /// Initializes a new hinge joint.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="hingeCenter"/> contains a non-finite value, when
+    /// <paramref name="hingeAxis"/> is zero or contains a non-finite value, when either body does not belong
+    /// to <paramref name="world"/>, or when both body references are the same.
+    /// </exception>
     public HingeJoint(World world, RigidBody body1, RigidBody body2, JVector hingeCenter, JVector hingeAxis,
         AngularLimit angle, bool hasMotor = false)
     {
@@ -48,6 +56,7 @@ public class HingeJoint : Joint
         }
     }
 
+    /// <inheritdoc cref="HingeJoint(World, RigidBody, RigidBody, JVector, JVector, AngularLimit, bool)"/>
     public HingeJoint(World world, RigidBody body1, RigidBody body2, JVector hingeCenter, JVector hingeAxis,
         bool hasMotor = false) :
         this(world, body1, body2, hingeCenter, hingeAxis, AngularLimit.Full, hasMotor)

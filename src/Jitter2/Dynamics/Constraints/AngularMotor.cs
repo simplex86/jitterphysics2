@@ -61,6 +61,9 @@ public unsafe class AngularMotor : Constraint<AngularMotor.AngularMotorData>
     /// Stores the axes in local frames. Both axes are normalized internally.
     /// Default values: <see cref="TargetVelocity"/> = 0, <see cref="MaximumForce"/> = 0.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis1"/> or <paramref name="axis2"/> is zero or contains a non-finite value.
+    /// </exception>
     public void Initialize(JVector axis1, JVector axis2)
     {
         VerifyNotZero();
@@ -85,6 +88,9 @@ public unsafe class AngularMotor : Constraint<AngularMotor.AngularMotorData>
     /// Initializes the motor with the same axis for both bodies.
     /// </summary>
     /// <param name="axis">The motor axis in world space, used for both bodies.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis"/> is zero or contains a non-finite value.
+    /// </exception>
     public void Initialize(JVector axis)
     {
         Initialize(axis, axis);

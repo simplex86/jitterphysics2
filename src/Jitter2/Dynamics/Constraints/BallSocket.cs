@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Jitter2.LinearMath;
@@ -62,6 +63,9 @@ public unsafe class BallSocket : Constraint<BallSocket.BallSocketData>
     /// Computes local anchor points for each body from their current poses.
     /// Default values: <see cref="Bias"/> = <see cref="Constraint.DefaultLinearBias"/>, <see cref="Softness"/> = <see cref="Constraint.DefaultLinearSoftness"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="anchor"/> contains a non-finite value.
+    /// </exception>
     public void Initialize(JVector anchor)
     {
         VerifyNotZero();

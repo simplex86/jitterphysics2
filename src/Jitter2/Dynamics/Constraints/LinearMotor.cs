@@ -55,6 +55,9 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     /// <summary>
     /// Gets or sets the motor axis on the first body in local space.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the assigned value is not finite or normalized.
+    /// </exception>
     public JVector LocalAxis1
     {
         get => Data.LocalAxis1;
@@ -67,6 +70,9 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     /// <summary>
     /// Gets or sets the motor axis on the second body in local space.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the assigned value is not finite or normalized.
+    /// </exception>
     public JVector LocalAxis2
     {
         get => Data.LocalAxis2;
@@ -85,6 +91,9 @@ public unsafe class LinearMotor : Constraint<LinearMotor.LinearMotorData>
     /// Stores the axes in local frames. Both axes are normalized internally.
     /// Default values: <see cref="TargetVelocity"/> = 0, <see cref="MaximumForce"/> = 0.
     /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="axis1"/> or <paramref name="axis2"/> is zero or contains a non-finite value.
+    /// </exception>
     public void Initialize(JVector axis1, JVector axis2)
     {
         VerifyNotZero();
