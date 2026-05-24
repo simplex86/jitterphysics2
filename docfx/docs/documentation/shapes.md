@@ -42,7 +42,7 @@ public ConvexHullShape(List<JTriangle> triangles)
 ```
 
 The triangles provided *must* form a convex hull.
-The validity of the convex shape is not checked.
+Apart from rejecting zero-mass hulls, the validity of the convex shape is not checked.
 Invalid shapes can lead to glitched
 collisions and/or non-terminating algorithms during collision detection.
 The triangles are used to construct an internal acceleration structure that speeds up collision detection for this shape through hill-climbing.

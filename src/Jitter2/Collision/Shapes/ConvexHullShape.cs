@@ -63,10 +63,11 @@ public class ConvexHullShape : RigidBodyShape, ICloneableShape<ConvexHullShape>
     /// <param name="triangles">All vertices defining the convex hull. The vertices must strictly lie
     /// on the surface of the convex hull to avoid incorrect results or indefinite hangs in the collision algorithm.</param>
     /// <exception cref="ArgumentException">
-    /// Thrown when <paramref name="triangles"/> is empty.
+    /// Thrown when <paramref name="triangles"/> is empty, or when the convex hull consists of more than
+    /// <see cref="ushort.MaxValue"/> vertices.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the convex hull consists of more than <see cref="ushort.MaxValue"/> vertices.
+    /// Thrown when <paramref name="triangles"/> does not define a non-degenerate volume.
     /// </exception>
     public ConvexHullShape(ReadOnlySpan<JTriangle> triangles)
     {
@@ -84,8 +85,8 @@ public class ConvexHullShape : RigidBodyShape, ICloneableShape<ConvexHullShape>
 
             if (tmpVertices.Count >= ushort.MaxValue)
             {
-                throw new InvalidOperationException(
-                    $"The convex hull consists of too many vertices (>{ushort.MaxValue})");
+                throw new ArgumentException(
+                    $"The convex hull consists of too many vertices (>{ushort.MaxValue}).", nameof(triangles));
             }
 
             result = (ushort)tmpVertices.Count;
@@ -222,6 +223,9 @@ public class ConvexHullShape : RigidBodyShape, ICloneableShape<ConvexHullShape>
     /// <summary>
     /// Updates the shape's cached mass, inertia, and bounding box.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the convex hull does not define a non-degenerate volume.
+    /// </exception>
     public void UpdateShape()
     {
         CalculateMassInertia();
@@ -239,6 +243,9 @@ public class ConvexHullShape : RigidBodyShape, ICloneableShape<ConvexHullShape>
     /// <summary>
     /// Recalculates the mass, center of mass, and inertia tensor from the convex hull triangles.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the convex hull does not define a non-degenerate volume.
+    /// </exception>
     public void CalculateMassInertia()
     {
         cachedCenter = JVector.Zero;
@@ -289,6 +296,13 @@ public class ConvexHullShape : RigidBodyShape, ICloneableShape<ConvexHullShape>
             cachedInertia += tetrahedronInertia;
             cachedCenter += tetrahedronMass * tetrahedronCom;
             cachedMass += tetrahedronMass;
+        }
+
+        const Real minimumMass = (Real)1e-12;
+
+        if (!Real.IsFinite(cachedMass) || cachedMass <= minimumMass)
+        {
+            throw new InvalidOperationException("Convex hull must define a non-degenerate volume.");
         }
 
         cachedInertia = JMatrix.Multiply(JMatrix.Identity, cachedInertia.Trace()) - cachedInertia;

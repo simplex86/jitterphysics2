@@ -40,6 +40,14 @@ public class ArgumentValidationTests
     }
 
     [Test]
+    public void ConvexHullShape_WithZeroMassTriangles_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => _ = new ConvexHullShape([
+            new JTriangle(JVector.Zero, JVector.UnitX, JVector.UnitY)
+        ]));
+    }
+
+    [Test]
     public void SupportPrimitiveCreation_WithInfiniteDimension_Throws()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => _ = SupportPrimitives.CreateSphere(Real.PositiveInfinity));
