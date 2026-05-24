@@ -58,7 +58,9 @@ public class ConstraintLifecycleTests
         var world = new World();
         var body = world.CreateRigidBody();
 
-        Assert.Throws<ArgumentException>(() => world.CreateConstraint<BallSocket>(body, body));
+        var exception = Assert.Throws<SameBodyException>(() =>
+            world.CreateConstraint<BallSocket>(body, body));
+        Assert.That(exception!.ParamName, Is.EqualTo("body2"));
         world.Dispose();
     }
 

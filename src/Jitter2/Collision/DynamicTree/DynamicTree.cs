@@ -387,15 +387,18 @@ public partial class DynamicTree
     /// <typeparam name="T">The proxy type.</typeparam>
     /// <param name="proxy">The proxy to add.</param>
     /// <param name="active">If <c>true</c>, the proxy is tracked for movement each update.</param>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown if the proxy is already in this tree, or if its bounding box is too large for robust tree balancing.
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="proxy"/> is already registered with this tree instance.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="proxy"/>'s bounding box is too large for robust tree balancing.
     /// </exception>
     public void AddProxy<T>(T proxy, bool active = true) where T : class, IDynamicTreeProxy
     {
         if (proxies.Contains(proxy))
         {
-            throw new InvalidOperationException(
-                $"The proxy '{proxy}' has already been added to this tree instance.");
+            throw new ArgumentException(
+                $"The proxy '{proxy}' has already been added to this tree instance.", nameof(proxy));
         }
 
         // 2^53 (approx 9e15) is the limit where double-precision values lose integer precision
@@ -404,10 +407,12 @@ public partial class DynamicTree
         //
         // Note: Since TreeBox calculates surface area using 'double', this assertion
         // is valid and necessary for both Single (float) and Double (double) precision builds.
-        if (proxy.WorldBoundingBox.GetSurfaceArea() > 9.007e15)
+        double surfaceArea = proxy.WorldBoundingBox.GetSurfaceArea();
+        if (surfaceArea > 9.007e15)
         {
-            throw new InvalidOperationException(
-                $"Added extremely large proxy to dynamic tree. Surface Area exceeds double precision limits (2^53).");
+            throw new ArgumentOutOfRangeException(
+                nameof(proxy), surfaceArea,
+                "The proxy's bounding box is too large for robust tree balancing.");
         }
 
         InternalAddProxy(proxy);

@@ -25,9 +25,37 @@ public sealed partial class World
     /// world's <see cref="DynamicTree"/>. Use <see cref="BroadPhaseFilter"/> to filter such pairs,
     /// or ensure only supported proxy types are added.
     /// </remarks>
-    public class InvalidCollisionTypeException(Type proxyA, Type proxyB) : Exception(
-        $"Don't know how to handle collision between {proxyA} and {proxyB}." +
-        $" Register a BroadPhaseFilter to handle and/or filter out these collision types.");
+    public class InvalidCollisionTypeException : Exception
+    {
+        private static string CreateMessage(Type proxyA, Type proxyB) =>
+            $"Don't know how to handle collision between {proxyA} and {proxyB}." +
+            " Register a BroadPhaseFilter to handle and/or filter out these collision types.";
+
+        public InvalidCollisionTypeException()
+        {
+        }
+
+        public InvalidCollisionTypeException(string message)
+            : base(message)
+        {
+        }
+
+        public InvalidCollisionTypeException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
+
+        public InvalidCollisionTypeException(Type proxyA, Type proxyB)
+            : base(CreateMessage(proxyA, proxyB))
+        {
+            ProxyA = proxyA;
+            ProxyB = proxyB;
+        }
+
+        public Type? ProxyA { get; }
+
+        public Type? ProxyB { get; }
+    }
 
     /// <summary>
     /// Hook into the narrow-phase collision detection pipeline.

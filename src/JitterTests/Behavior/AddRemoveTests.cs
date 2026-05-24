@@ -143,7 +143,10 @@ public class AddRemoveTests
         var local = world.CreateRigidBody();
         var foreign = other.CreateRigidBody();
 
-        Assert.Throws<ArgumentException>(() => world.CreateConstraint<BallSocket>(foreign, local));
-        Assert.Throws<ArgumentException>(() => world.CreateConstraint<BallSocket>(local, foreign));
+        var body1 = Assert.Throws<ArgumentException>(() => world.CreateConstraint<BallSocket>(foreign, local));
+        Assert.That(body1!.ParamName, Is.EqualTo("body1"));
+
+        var body2 = Assert.Throws<ArgumentException>(() => world.CreateConstraint<BallSocket>(local, foreign));
+        Assert.That(body2!.ParamName, Is.EqualTo("body2"));
     }
 }
