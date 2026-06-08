@@ -8,11 +8,10 @@ Jitter Physics 2, the evolution of [Jitter Physics](https://github.com/notgiven6
 
 📦 The official **NuGet** package ([changelog](https://jitterphysics.com/docs/changelog)) can be found [here](https://www.nuget.org/packages/Jitter2), the *double precision* version [here](https://www.nuget.org/packages/Jitter2.Double).
 
----
+🧪 There is also an experimental C++ port available at [jitterphysics2cpp](https://github.com/notgiven688/jitterphysics2cpp).
+It is an automatic AI port of Jitter Physics 2 intended for performance comparison experiments.
 
 ▶️ Try the interactive demo and explore the docs at **[jitterphysics.com](https://jitterphysics.com/docs/introduction.html)**.
-
-There is also a tiny demo available for the [Godot engine](other/GodotDemo) 🎮.
 
 ---
 
